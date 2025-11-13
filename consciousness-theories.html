@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Consciousness Theories — WebGL</title>
+    <style>
+        html, body { height: 100%; margin: 0; overflow: hidden; background: #000000; color: #e8ecf1; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+        #app { position: fixed; inset: 0; }
+        canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+        #labels { position: absolute; inset: 0; pointer-events: none; }
+        .label { position: absolute; transform: translate(-50%, -100%); background: rgba(10,15,30,0.85); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 3px 6px; font-size: 13px; white-space: nowrap; }
+        #hud { position: fixed; left: 10px; top: 10px; padding: 6px 10px; background: rgba(8,12,24,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; font-size: 12px; }
+        #banner { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px; background: rgba(8, 12, 24, 0.95); border-top: 1px solid rgba(255,255,255,0.08); max-height: 35vh; overflow: auto; box-shadow: 0 -10px 30px rgba(0,0,0,0.3); display: none; }
+        #banner h2 { margin: 0 0 6px; font-size: 16px; }
+        #banner p { margin: 0; line-height: 1.4; opacity: 0.95; }
+        #closeBanner { position: absolute; right: 12px; top: 8px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #e8ecf1; border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+        a { color: #7cc8ff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <canvas id="gl"></canvas>
+    <div id="labels"></div>
+</div>
+<div id="hud">Drag to orbit • Wheel to zoom • Click a sphere to view description • Colors group similar theories • Dashed gray = cross-group links</div>
+<div id="banner">
+    <button id="closeBanner" title="Close">Close ✕</button>
+    <h2 id="bannerTitle"></h2>
+    <p id="bannerText"></p>
+</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.166.1/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.166.1/examples/jsm/"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const theories = [
+        // Materialism
+        { id: 'PHIL', name: 'Philosophical', desc: 'Materialism as a philosophical stance.', group: 'materialism' },
+        { id: 'EPIP', name: 'Epiphenomenalism', desc: 'Mental events are caused by physical events in the brain, but have no effects upon any physical events.', group: 'materialism' },
+        { id: 'FUNC', name: 'Functionalism', desc: 'Mental states are defined by their function, not their physical makeup.', group: 'materialism' },
+        { id: 'EMER', name: 'Emergence', desc: 'Consciousness emerges from complex physical processes.', group: 'materialism' },
+        { id: 'IDEN', name: 'Identity', desc: 'Mental states are identical to brain states.', group: 'materialism' },
+        { id: 'ELIM', name: 'Eliminative/Illusionism', desc: 'Common-sense understanding of the mind is wrong and that certain classes of mental states that most people believe in do not exist.', group: 'materialism' },
+        { id: 'NEUR', name: 'Neurobiological', desc: 'Consciousness is a product of biological processes in the brain.', group: 'materialism' },
+        { id: 'CIRC', name: 'Circuits/cycles', desc: 'Consciousness arises from neural circuits and cycles.', group: 'materialism' },
+        { id: 'DEND', name: 'Dendritic', desc: 'Dendritic integration is a key component of consciousness.', group: 'materialism' },
+        { id: 'ELEC', name: 'Electromagnetic Field', desc: 'Consciousness is identical with the brain\'s electromagnetic field.', group: 'materialism' },
+        { id: 'COMP', name: 'Computational & Functionalism', desc: 'The mind is a computational system.', group: 'materialism' },
+        { id: 'CPLX', name: 'Complex/adaptive', desc: 'Consciousness is a feature of complex adaptive systems.', group: 'materialism' },
+        { id: 'CRIT', name: 'Critical brain', desc: 'The brain operates near a critical point, and this is essential for consciousness.', group: 'materialism' },
+        { id: 'MATH', name: 'Mathematical', desc: 'Mathematical models can explain consciousness.', group: 'materialism' },
+        { id: 'HOME', name: 'Homeostatic & Affective', desc: 'Consciousness is related to the regulation of bodily states.', group: 'materialism' },
+        { id: 'PRED', name: 'Predictive', desc: 'The brain is a prediction machine, and consciousness is related to this process.', group: 'materialism' },
+        { id: 'ENTR', name: 'Entropic', desc: 'The brain aims to minimize free energy, and this is related to consciousness.', group: 'materialism' },
+        { id: 'PROJ', name: 'Projective', desc: 'The brain projects a model of the world, and this is what we experience as consciousness.', group: 'materialism' },
+        { id: 'EMBO', name: 'Embodied & Enactive', desc: 'Consciousness is shaped by the body and its interaction with the world.', group: 'materialism' },
+        { id: 'ENAC', name: 'Enactivism', desc: 'Cognition arises through a dynamic interaction between an acting organism and its environment.', group: 'materialism' },
+        { id: 'BLIN', name: 'Blind Spot', desc: 'We are unaware of the processes that give rise to our conscious experience.', group: 'materialism' },
+        { id: 'RELA', name: 'Relational', desc: 'Consciousness is a relational property.', group: 'materialism' },
+        { id: 'FIRS', name: 'First-Order', desc: 'Consciousness is a first-order property of mental states.', group: 'materialism' },
+        { id: 'HIGH', name: 'Higher-Order', desc: 'A mental state is conscious when it is the object of a higher-order mental state.', group: 'materialism' },
+        { id: 'LANG', name: 'Language Relationships', desc: 'Language plays a crucial role in consciousness.', group: 'materialism' },
+        { id: 'PHYLO', name: 'Phylogenetic/Evolutionary', desc: 'Consciousness has an evolutionary history.', group: 'materialism' },
+        { id: 'VALU', name: 'Value', desc: 'Consciousness is related to the assignment of value.', group: 'materialism' },
+        { id: 'NEURE', name: 'Neuroethology', desc: 'The study of the neural basis of animal behavior can shed light on consciousness.', group: 'materialism' },
+
+        // Non-Reductive Physicalism
+        { id: 'NONRED', name: 'Non-Reductive Physicalism', desc: 'Mental properties are not reducible to physical properties, but they are still dependent on them.', group: 'non-reductive-physicalism' },
+
+        // Quantum & Dimensions
+        { id: 'QUANT', name: 'Quantum & Dimensions', desc: 'Quantum mechanics and extra dimensions may be relevant to consciousness.', group: 'quantum' },
+
+        // Information
+        { id: 'INFO', name: 'Information', desc: 'Consciousness is related to information processing.', group: 'information' },
+
+        // Panpsychisms
+        { id: 'PAN', name: 'Panpsychisms', desc: 'Consciousness is a fundamental property of the universe.', group: 'panpsychism' },
+        { id: 'MICR', name: 'Micropsychism', desc: 'Consciousness is a property of fundamental particles.', group: 'panpsychism' },
+        { id: 'PANP', name: 'Panprotopsychism', desc: 'Fundamental particles have protoconscious properties.', group: 'panpsychism' },
+        { id: 'COSM', name: 'Cosmopsychism', desc: 'The universe as a whole is conscious.', group: 'panpsychism' },
+        { id: 'QUALIAF', name: 'Qualia force', desc: 'Qualia are a fundamental force of nature.', group: 'panpsychism' },
+        { id: 'QUALIAS', name: 'Qualia space', desc: 'Qualia exist in a space of their own.', group: 'panpsychism' },
+
+        // Monisms
+        { id: 'MON', name: 'Monisms', desc: 'There is only one fundamental substance.', group: 'monism' },
+        { id: 'RUSS', name: 'Russellian', desc: 'The intrinsic nature of physical reality is conscious.', group: 'monism' },
+        { id: 'DAVI', name: 'Davidson', desc: 'Anomalous monism.', group: 'monism' },
+        { id: 'VELM', name: 'Velmans', desc: 'Reflexive monism.', group: 'monism' },
+        { id: 'STRA', name: 'Strawson', desc: 'Realistic monism.', group: 'monism' },
+        { id: 'POLK', name: 'Polkinghorne', desc: 'Dual-aspect monism.', group: 'monism' },
+        { id: 'TEIL', name: 'Teilhard', desc: 'The Omega Point.', group: 'monism' },
+        { id: 'ATMA', name: 'Atmanspacher', desc: 'Dual-aspect monism.', group: 'monism' },
+        { id: 'PERE', name: 'Pereira', desc: 'Triple-aspect monism.', group: 'monism' },
+        { id: 'RAMA', name: 'Ramachandran', desc: 'Consciousness is a product of the brain.', group: 'monism' },
+        { id: 'TEGM', name: 'Tegmark', desc: 'The Mathematical Universe Hypothesis.', group: 'monism' },
+        { id: 'QRIV', name: 'QRI Valence', desc: 'The valence of experience is a real physical property.', group: 'monism' },
+        { id: 'BENT', name: 'Bentley Hart', desc: 'The Experience of God.', group: 'monism' },
+        { id: 'LESL', name: 'Leslie', desc: 'The End of the World.', group: 'monism' },
+
+        // Dualisms
+        { id: 'DUAL', name: 'Dualisms', desc: 'There are two fundamental substances.', group: 'dualism' },
+        { id: 'TRAD', name: 'Traditional', desc: 'Mind and body are distinct substances.', group: 'dualism' },
+        { id: 'PROP', name: 'Property', desc: 'The brain has both physical and mental properties.', group: 'dualism' },
+        { id: 'EPIPD', name: 'Epiphenomenalism', desc: 'Mental events are caused by physical events, but have no causal effects.', group: 'dualism' },
+        { id: 'COMPD', name: 'Composite', desc: 'Humans are composed of both a physical body and a non-physical soul.', group: 'dualism' },
+        { id: 'INTED', name: 'Interactive', desc: 'Mind and body interact with each other.', group: 'dualism' },
+        { id: 'EMERD', name: 'Emergent', desc: 'Mental properties emerge from physical properties.', group: 'dualism' },
+        { id: 'KINDD', name: 'Kind', desc: 'There are different kinds of dualism.', group: 'dualism' },
+        { id: 'JEW', name: 'Jewish', desc: 'Jewish views on the soul.', group: 'dualism' },
+        { id: 'CHRI', name: 'Christian', desc: 'Christian views on the soul.', group: 'dualism' },
+        { id: 'ISLA', name: 'Islamic', desc: 'Islamic views on the soul.', group: 'dualism' },
+        { id: 'GOD', name: 'God', desc: 'The relationship between God and consciousness.', group: 'dualism' },
+        { id: 'INDI', name: 'Indian', desc: 'Indian views on consciousness.', group: 'dualism' },
+        { id: 'INDIG', name: 'Indigenous', desc: 'Indigenous views on consciousness.', group: 'dualism' },
+        { id: 'TRIA', name: 'Trialism', desc: 'There are three fundamental substances.', group: 'dualism' },
+        { id: 'SOUL', name: 'Soul Realms', desc: 'The soul exists in a realm of its own.', group: 'dualism' },
+        { id: 'THEO', name: 'Theosophy', desc: 'Theosophical views on consciousness.', group: 'dualism' },
+
+        // Idealisms
+        { id: 'IDEA', name: 'Idealisms', desc: 'Reality is fundamentally mental.', group: 'idealism' },
+        { id: 'INDII', name: 'Indian', desc: 'Indian idealist traditions.', group: 'idealism' },
+        { id: 'BUDD', name: 'Buddhism', desc: 'Buddhist views on consciousness.', group: 'idealism' },
+        { id: 'DAOD', name: 'Dao De Jing', desc: 'The Dao De Jing and consciousness.', group: 'idealism' },
+        { id: 'UNIV', name: 'Universe', desc: 'The universe is a conscious being.', group: 'idealism' },
+
+        // Anomalous & Altered States
+        { id: 'ANOM', name: 'Anomalous & Altered States', desc: 'Experiences that are outside the norm.', group: 'anomalous' },
+        { id: 'NDES', name: 'NDEs/Survival', desc: 'Near-death experiences and the possibility of survival after death.', group: 'anomalous' },
+        { id: 'DOPS', name: 'DOPS', desc: 'Distressing obsessive-compulsive-like phenomena.', group: 'anomalous' },
+        { id: 'MEDI', name: 'Meditation', desc: 'The effects of meditation on consciousness.', group: 'anomalous' },
+        { id: 'PSYC', name: 'Psychedelic', desc: 'The effects of psychedelic drugs on consciousness.', group: 'anomalous' },
+
+        // Challenge
+        { id: 'CHAL', name: 'Challenge', desc: 'The hard problem of consciousness.', group: 'challenge' },
+
+        // Implications
+        { id: 'IMPL', name: 'Implications', desc: 'The implications of consciousness research.', group: 'implications' },
+        { id: 'MEAN', name: 'Meaning / Purpose', desc: 'The meaning and purpose of life.', group: 'implications' },
+        { id: 'AICO', name: 'AI Consciousness', desc: 'The possibility of artificial consciousness.', group: 'implications' },
+        { id: 'VIRT', name: 'Virtual Immortality', desc: 'The possibility of uploading consciousness to a computer.', group: 'implications' },
+        { id: 'LIFE', name: 'Life after Death', desc: 'The possibility of life after death.', group: 'implications' }
+    ];
+
+    const edges = [
+        // Materialism
+        ['PHIL', 'EPIP'], ['PHIL', 'FUNC'], ['PHIL', 'EMER'], ['PHIL', 'IDEN'], ['PHIL', 'ELIM'],
+        ['NEUR', 'CIRC'], ['NEUR', 'DEND'],
+        ['COMP', 'CPLX'], ['COMP', 'CRIT'], ['COMP', 'MATH'],
+        ['HOME', 'PRED'], ['HOME', 'ENTR'], ['HOME', 'PROJ'],
+        ['EMBO', 'ENAC'], ['EMBO', 'BLIN'],
+        ['FIRS', 'HIGH'],
+        ['PHYLO', 'VALU'], ['PHYLO', 'NEURE'],
+
+        // Panpsychisms
+        ['PAN', 'MICR'], ['PAN', 'PANP'], ['PAN', 'COSM'], ['PAN', 'QUALIAF'], ['PAN', 'QUALIAS'],
+
+        // Monisms
+        ['MON', 'RUSS'], ['MON', 'DAVI'], ['MON', 'VELM'], ['MON', 'STRA'], ['MON', 'POLK'], ['MON', 'TEIL'], ['MON', 'ATMA'], ['MON', 'PERE'], ['MON', 'RAMA'], ['MON', 'TEGM'], ['MON', 'QRIV'], ['MON', 'BENT'], ['MON', 'LESL'],
+
+        // Dualisms
+        ['DUAL', 'TRAD'], ['DUAL', 'PROP'], ['DUAL', 'EPIPD'], ['DUAL', 'COMPD'], ['DUAL', 'INTED'], ['DUAL', 'EMERD'], ['DUAL', 'KINDD'], ['DUAL', 'JEW'], ['DUAL', 'CHRI'], ['DUAL', 'ISLA'], ['DUAL', 'GOD'], ['DUAL', 'INDI'], ['DUAL', 'INDIG'], ['DUAL', 'TRIA'], ['DUAL', 'SOUL'], ['DUAL', 'THEO'],
+
+        // Idealisms
+        ['IDEA', 'INDII'], ['IDEA', 'BUDD'], ['IDEA', 'DAOD'], ['IDEA', 'UNIV'],
+
+        // Anomalous & Altered States
+        ['ANOM', 'NDES'], ['ANOM', 'DOPS'], ['ANOM', 'MEDI'], ['ANOM', 'PSYC'],
+
+        // Implications
+        ['IMPL', 'MEAN'], ['IMPL', 'AICO'], ['IMPL', 'VIRT'], ['IMPL', 'LIFE'],
+
+        // Cross-group links
+        ['PHIL', 'NONRED'],
+        ['NONRED', 'QUANT'],
+        ['QUANT', 'INFO'],
+        ['INFO', 'PAN'],
+        ['PAN', 'MON'],
+        ['MON', 'DUAL'],
+        ['DUAL', 'IDEA'],
+        ['IDEA', 'ANOM'],
+        ['ANOM', 'CHAL'],
+        ['CHAL', 'IMPL']
+    ];
+
+    const groupColors = {
+        materialism: 0xFFC445,
+        'non-reductive-physicalism': 0x6BC7E3,
+        quantum: 0xF266A6,
+        information: 0xBA8FF9,
+        panpsychism: 0x78E68F,
+        monism: 0xFF8C00,
+        dualism: 0x00BFFF,
+        idealism: 0xDA70D6,
+        anomalous: 0x32CD32,
+        challenge: 0xFF4500,
+        implications: 0x8A2BE2
+    };
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 100;
+    controls.maxDistance = 500;
+
+    const nodes = {};
+    const Rscene = 90;
+
+    theories.forEach((theory, i) => {
+        const phi = Math.acos(1 - 2 * (i + 0.5) / theories.length);
+        const theta = Math.PI * (1 + Math.sqrt(5)) * (i + 0.5);
+
+        const x = Rscene * Math.sin(phi) * Math.cos(theta);
+        const y = Rscene * Math.cos(phi);
+        const z = Rscene * Math.sin(phi) * Math.sin(theta);
+
+        const geometry = new THREE.SphereGeometry(5, 32, 32);
+        const material = new THREE.MeshStandardMaterial({ color: groupColors[theory.group] });
+        const sphere = new THREE.Mesh(geometry, material);
+        sphere.position.set(x, y, z);
+        sphere.userData = theory;
+        scene.add(sphere);
+        nodes[theory.id] = sphere;
+    });
+
+    const edgeGroup = new THREE.Group();
+    edges.forEach(edge => {
+        const startNode = nodes[edge[0]];
+        const endNode = nodes[edge[1]];
+        if (startNode && endNode) {
+            const startTheory = theories.find(t => t.id === edge[0]);
+            const endTheory = theories.find(t => t.id === edge[1]);
+            const material = new THREE.LineBasicMaterial({
+                color: startTheory.group === endTheory.group ? groupColors[startTheory.group] : 0x808080,
+            });
+            if (startTheory.group !== endTheory.group) {
+                material.dashed = true;
+                material.dashSize = 3;
+                material.gapSize = 3;
+            }
+            const points = [startNode.position, endNode.position];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, material);
+            if (startTheory.group !== endTheory.group) {
+                line.computeLineDistances();
+            }
+            edgeGroup.add(line);
+        }
+    });
+    scene.add(edgeGroup);
+
+    const ambientLight = new THREE.AmbientLight(0x404040);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight.position.set(1, 1, 1);
+    scene.add(directionalLight);
+
+    camera.position.z = 180;
+
+    const labelsLayer = document.getElementById('labels');
+    const labelEls = {};
+    theories.forEach(theory => {
+        const el = document.createElement('div');
+        el.className = 'label';
+        el.textContent = theory.name;
+        labelsLayer.appendChild(el);
+        labelEls[theory.id] = el;
+    });
+
+    const banner = document.getElementById('banner');
+    const bannerTitle = document.getElementById('bannerTitle');
+    const bannerText = document.getElementById('bannerText');
+    document.getElementById('closeBanner').addEventListener('click', () => {
+        banner.style.display = 'none';
+    });
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function onClick(event) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(scene.children.filter(c => c instanceof THREE.Mesh));
+        if (intersects.length > 0) {
+            const { name, desc } = intersects[0].object.userData;
+            bannerTitle.textContent = name;
+            bannerText.textContent = desc;
+            banner.style.display = 'block';
+        }
+    }
+    window.addEventListener('click', onClick);
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', onWindowResize);
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+
+        Object.values(nodes).forEach(node => {
+            const vector = new THREE.Vector3();
+            node.getWorldPosition(vector);
+            vector.project(camera);
+            const x = (vector.x * .5 + .5) * window.innerWidth;
+            const y = (vector.y * -.5 + .5) * window.innerHeight;
+            const label = labelEls[node.userData.id];
+            label.style.left = `${x}px`;
+            label.style.top = `${y}px`;
+        });
+
+        renderer.render(scene, camera);
+    }
+    animate();
+</script>
+</body>
+</html>
