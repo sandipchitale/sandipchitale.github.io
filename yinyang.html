@@ -6,7 +6,7 @@
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #888;
+            background-color: #222;
             font-family: sans-serif;
         }
 
@@ -15,11 +15,14 @@
             top: 10px;
             width: 100%;
             text-align: center;
-            color: white;
+            color: #888;
             pointer-events: none;
             z-index: 1;
             text-shadow: 1px 1px 2px black;
         }
+
+        h2 { margin: 0; color: #ccc; }
+        p { margin: 5px; font-size: 0.9em; }
 
         #controls {
             position: absolute;
@@ -78,7 +81,7 @@
 <body>
 <div id="info">
     <h2>Encased Intersection Gimbal</h2>
-    <p>Split internal rails • Continuous outer glass shell</p>
+    <p>Fixed: Valid Geometry • Central Clearance Arcs</p>
 </div>
 
 <div id="controls">
@@ -110,11 +113,11 @@
     controls.enableDamping = true;
 
     // 2. LIGHTING
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
     const dirLight = new THREE.DirectionalLight(0xffffff, 1);
     dirLight.position.set(5, 10, 5);
     scene.add(dirLight);
-    const backLight = new THREE.DirectionalLight(0x00ddee, 0.8);
+    const backLight = new THREE.DirectionalLight(0x00ddee, 1.0);
     backLight.position.set(-5, -5, -5);
     scene.add(backLight);
 
@@ -122,21 +125,22 @@
     const frameRadius = 4.0;
     const splitGap = 0.12;
     const splitTubeRadius = 0.08;
-    const outerClampRadius = 0.36; // DOUBLED thickness: was 0.18, now 0.36
+    const outerClampRadius = 0.36;
 
     const shapeRadius = frameRadius - 0.1;
-    const shapeThickness = 0.06;
+    const shapeThickness = 0.15; // Slightly thicker for visibility
+    const centerHoleRadius = 0.35; // Size of the central "ark" cutout
 
     // Gap Angle (How much material to remove at intersection)
     const intersectionGap = Math.PI / 36;
 
     const matWhite = new THREE.MeshStandardMaterial({color: 0xdddddd, roughness: 0.2});
     const matYinWhite = new THREE.MeshStandardMaterial({color: 0xffffff, side: THREE.DoubleSide});
-    const matYangBlack = new THREE.MeshStandardMaterial({color: 0x000000, side: THREE.DoubleSide});
+    const matYangBlack = new THREE.MeshStandardMaterial({color: 0x111111, side: THREE.DoubleSide}); // Dark grey to be visible against bg
     const matSilver = new THREE.MeshStandardMaterial({color: 0xffffff, metalness: 0.9, roughness: 0.1});
 
     const matGlass = new THREE.MeshPhysicalMaterial({
-        color: 0xaaccff, // Slight blue tint
+        color: 0xaaccff,
         metalness: 0.1,
         roughness: 0.05,
         transmission: 0.95,
@@ -149,39 +153,35 @@
 
     // 4. GEOMETRY FUNCTIONS
 
-    // A. The "Gapped" Frame with Continuous Shell
+    // A. The "Gapped" Frame
     function createGappedFrame(radius) {
         const group = new THREE.Group();
 
-        // --- 1. The Internal Split Rails (White) ---
+        // Internal Split Rails
         const arcLength = Math.PI - intersectionGap;
         const start1 = intersectionGap / 2;
         const start2 = Math.PI + intersectionGap / 2;
 
         function buildRail(zOffset) {
             const railGroup = new THREE.Group();
-
-            // Arc 1
             const geo1 = new THREE.TorusGeometry(radius, splitTubeRadius, 16, 64, arcLength);
             geo1.rotateZ(start1);
             const mesh1 = new THREE.Mesh(geo1, matWhite);
             mesh1.position.z = zOffset;
             railGroup.add(mesh1);
 
-            // Arc 2
             const geo2 = new THREE.TorusGeometry(radius, splitTubeRadius, 16, 64, arcLength);
             geo2.rotateZ(start2);
             const mesh2 = new THREE.Mesh(geo2, matWhite);
             mesh2.position.z = zOffset;
             railGroup.add(mesh2);
-
             return railGroup;
         }
 
-        group.add(buildRail(splitGap / 2 + splitTubeRadius / 2));      // Top Lip
-        group.add(buildRail(-(splitGap / 2 + splitTubeRadius / 2)));   // Bottom Lip
+        group.add(buildRail(splitGap / 2 + splitTubeRadius / 2));
+        group.add(buildRail(-(splitGap / 2 + splitTubeRadius / 2)));
 
-        // --- 2. The Outer Wrapper (Glass) ---
+        // Outer Wrapper (Glass)
         const glassGeo = new THREE.TorusGeometry(radius, outerClampRadius, 24, 100, Math.PI * 2);
         const glassMesh = new THREE.Mesh(glassGeo, matGlass);
         group.add(glassMesh);
@@ -189,12 +189,59 @@
         return group;
     }
 
-    // B. The Yin/Yang Shape
-    function createTeardropShape(radius) {
+    // B. The Safe Yin/Yang Shape (Calculated Contour)
+    function createTeardropShape(R, r_hole) {
         const shape = new THREE.Shape();
-        shape.absarc(0, 0, radius, -Math.PI / 2, Math.PI / 2, false);
-        shape.absarc(0, radius / 2, radius / 2, Math.PI / 2, 3 * Math.PI / 2, false);
-        shape.absarc(0, -radius / 2, radius / 2, Math.PI / 2, 3 * Math.PI / 2, true);
+
+        // Helper: Intersection of Small Circle (S-curve) and Hole Circle
+        // S-Circle Equation: x^2 + (y - Ry_center)^2 = (R/2)^2
+        // Hole Equation: x^2 + y^2 = r_hole^2
+
+        const Rs = R / 2; // Radius of small circles
+
+        // 1. Top Intersection (Top S-Curve & Hole)
+        // Center (0, Rs). Equation: x^2 + y^2 - 2*y*Rs + Rs^2 = Rs^2  => x^2 + y^2 - R*y = 0
+        // Sub hole: r_hole^2 - R*y = 0 => y = r_hole^2 / R
+        const y_top = (r_hole * r_hole) / R;
+        const x_top = -Math.sqrt(r_hole * r_hole - y_top * y_top); // Negative because Top S bulges Left
+
+        // Angle on Top Small Circle (Center 0, Rs)
+        const angleTopEnd = Math.atan2(y_top - Rs, x_top - 0);
+
+        // 2. Bottom Intersection (Bottom S-Curve & Hole)
+        // Center (0, -Rs). y = -r_hole^2 / R
+        const y_bot = - (r_hole * r_hole) / R;
+        const x_bot = Math.sqrt(r_hole * r_hole - y_bot * y_bot); // Positive because Bottom S bulges Right (scoop)
+
+        // Angle on Bottom Small Circle (Center 0, -Rs)
+        const angleBotStart = Math.atan2(y_bot - (-Rs), x_bot - 0);
+
+        // 3. Angles on Hole Circle (Center 0,0)
+        const angleHoleStart = Math.atan2(y_top, x_top);
+        const angleHoleEnd = Math.atan2(y_bot, x_bot);
+
+        // --- DRAW PATH ---
+
+        // 1. Outer Arc (Right Semicircle)
+        // From Bottom (0, -R) to Top (0, R)
+        shape.absarc(0, 0, R, -Math.PI/2, Math.PI/2, false);
+
+        // 2. Top S-Curve (Head)
+        // From (0, R) to Top Intersection
+        // Center (0, Rs), Radius Rs.
+        // Standard starts at PI/2 (Top). Ends at angleTopEnd. CCW (false).
+        shape.absarc(0, Rs, Rs, Math.PI/2, angleTopEnd, false);
+
+        // 3. Center Cutout Arc
+        // Connects Top Intersection to Bottom Intersection via the Hole boundary.
+        // We keep "Solid on Left", so we trace the hole Clockwise (true).
+        shape.absarc(0, 0, r_hole, angleHoleStart, angleHoleEnd, true);
+
+        // 4. Bottom S-Curve (Tail Scoop)
+        // From Bottom Intersection to (0, -R).
+        // Center (0, -Rs), Radius Rs.
+        // Standard ends at -PI/2 (Bottom). Starts at angleBotStart. CW (true) to form scoop.
+        shape.absarc(0, -Rs, Rs, angleBotStart, -Math.PI/2, true);
 
         const geo = new THREE.ExtrudeGeometry(shape, {depth: shapeThickness, bevelEnabled: false});
         geo.translate(0, 0, -shapeThickness / 2);
@@ -215,11 +262,14 @@
             const x = radius * Math.cos(angle);
             const y = radius * Math.sin(angle);
 
-            const bearing = new THREE.Mesh(bearingGeo, matSilver);
-            bearing.position.set(x, y, 0);
-            bearing.rotation.z = angle;
-            if (i > 0 && i < count - 1) {
-                group.add(bearing);
+            const dist = Math.sqrt(x*x + y*y);
+            if(dist > centerHoleRadius + 0.3) {
+                const bearing = new THREE.Mesh(bearingGeo, matSilver);
+                bearing.position.set(x, y, 0);
+                bearing.rotation.z = angle;
+                if (i > 0 && i < count - 1) {
+                    group.add(bearing);
+                }
             }
         }
         return group;
@@ -233,13 +283,12 @@
     scene.add(frameP);
 
     const rotorP = new THREE.Group();
-    const shapeP = createTeardropShape(shapeRadius);
+    const shapeP = createTeardropShape(shapeRadius, centerHoleRadius);
     shapeP.material = matYinWhite;
     rotorP.add(shapeP);
     rotorP.add(createBearingArc(frameRadius, 9));
     rotorP.rotation.y = Math.PI / 2;
     scene.add(rotorP);
-
 
     // --- SYSTEM O (Horizontal) ---
     const frameO = createGappedFrame(frameRadius);
@@ -248,7 +297,7 @@
     scene.add(frameO);
 
     const rotorO = new THREE.Group();
-    const shapeO = createTeardropShape(shapeRadius);
+    const shapeO = createTeardropShape(shapeRadius, centerHoleRadius);
     shapeO.material = matYangBlack;
     rotorO.add(shapeO);
     rotorO.add(createBearingArc(frameRadius, 9));
@@ -257,13 +306,12 @@
     rotorO.rotation.z = Math.PI / 2;
     scene.add(rotorO);
 
-
     // 6. ANIMATION
     let time = 0;
     let isPlaying = true;
     let isFlipped = false;
     let lagDegrees = 0;
-    let lagRadians = lagDegrees * (Math.PI / 180);
+    let lagRadians = 0;
 
     function animate() {
         requestAnimationFrame(animate);
@@ -271,11 +319,7 @@
 
         if (isPlaying) {
             time += 0.015;
-
-            // ROTATION LOGIC
             rotorP.rotation.z = time;
-
-            // Frame O offset logic
             rotorO.rotation.z = (time + lagRadians) + Math.PI / 2;
         }
         renderer.render(scene, camera);
