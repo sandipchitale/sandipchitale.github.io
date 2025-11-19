@@ -6,7 +6,7 @@
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #222;
+            background-color: #888;
             font-family: sans-serif;
         }
 
@@ -131,8 +131,8 @@
     const intersectionGap = Math.PI / 8;
 
     const matWhite = new THREE.MeshStandardMaterial({color: 0xdddddd, roughness: 0.2});
-    const matPurple = new THREE.MeshStandardMaterial({color: 0x9b30ff, side: THREE.DoubleSide});
-    const matOrange = new THREE.MeshStandardMaterial({color: 0xffaa00, side: THREE.DoubleSide});
+    const matYinWhite = new THREE.MeshStandardMaterial({color: 0xffffff, side: THREE.DoubleSide});
+    const matYangBlack = new THREE.MeshStandardMaterial({color: 0x000000, side: THREE.DoubleSide});
     const matSilver = new THREE.MeshStandardMaterial({color: 0xffffff, metalness: 0.9, roughness: 0.1});
 
     const matGlass = new THREE.MeshPhysicalMaterial({
@@ -232,7 +232,7 @@
 
     const rotorP = new THREE.Group();
     const shapeP = createTeardropShape(shapeRadius);
-    shapeP.material = matPurple;
+    shapeP.material = matYinWhite;
     rotorP.add(shapeP);
     rotorP.add(createBearingArc(frameRadius, 9));
     rotorP.rotation.y = Math.PI / 2;
@@ -247,7 +247,7 @@
 
     const rotorO = new THREE.Group();
     const shapeO = createTeardropShape(shapeRadius);
-    shapeO.material = matOrange;
+    shapeO.material = matYangBlack;
     rotorO.add(shapeO);
     rotorO.add(createBearingArc(frameRadius, 9));
 
@@ -316,4 +316,3 @@
 </script>
 </body>
 </html>
-
