@@ -21,8 +21,15 @@
             text-shadow: 1px 1px 2px black;
         }
 
-        h2 { margin: 0; color: #ccc; }
-        p { margin: 5px; font-size: 0.9em; }
+        h2 {
+            margin: 0;
+            color: #ccc;
+        }
+
+        p {
+            margin: 5px;
+            font-size: 0.9em;
+        }
 
         #controls {
             position: absolute;
@@ -210,7 +217,7 @@
 
         // 2. Bottom Intersection (Bottom S-Curve & Hole)
         // Center (0, -Rs). y = -r_hole^2 / R
-        const y_bot = - (r_hole * r_hole) / R;
+        const y_bot = -(r_hole * r_hole) / R;
         const x_bot = Math.sqrt(r_hole * r_hole - y_bot * y_bot); // Positive because Bottom S bulges Right (scoop)
 
         // Angle on Bottom Small Circle (Center 0, -Rs)
@@ -224,13 +231,13 @@
 
         // 1. Outer Arc (Right Semicircle)
         // From Bottom (0, -R) to Top (0, R)
-        shape.absarc(0, 0, R, -Math.PI/2, Math.PI/2, false);
+        shape.absarc(0, 0, R, -Math.PI / 2, Math.PI / 2, false);
 
         // 2. Top S-Curve (Head)
         // From (0, R) to Top Intersection
         // Center (0, Rs), Radius Rs.
         // Standard starts at PI/2 (Top). Ends at angleTopEnd. CCW (false).
-        shape.absarc(0, Rs, Rs, Math.PI/2, angleTopEnd, false);
+        shape.absarc(0, Rs, Rs, Math.PI / 2, angleTopEnd, false);
 
         // 3. Center Cutout Arc
         // Connects Top Intersection to Bottom Intersection via the Hole boundary.
@@ -241,7 +248,7 @@
         // From Bottom Intersection to (0, -R).
         // Center (0, -Rs), Radius Rs.
         // Standard ends at -PI/2 (Bottom). Starts at angleBotStart. CW (true) to form scoop.
-        shape.absarc(0, -Rs, Rs, angleBotStart, -Math.PI/2, true);
+        shape.absarc(0, -Rs, Rs, angleBotStart, -Math.PI / 2, true);
 
         const geo = new THREE.ExtrudeGeometry(shape, {depth: shapeThickness, bevelEnabled: false});
         geo.translate(0, 0, -shapeThickness / 2);
@@ -262,8 +269,8 @@
             const x = radius * Math.cos(angle);
             const y = radius * Math.sin(angle);
 
-            const dist = Math.sqrt(x*x + y*y);
-            if(dist > centerHoleRadius + 0.3) {
+            const dist = Math.sqrt(x * x + y * y);
+            if (dist > centerHoleRadius + 0.3) {
                 const bearing = new THREE.Mesh(bearingGeo, matSilver);
                 bearing.position.set(x, y, 0);
                 bearing.rotation.z = angle;
