@@ -218,7 +218,9 @@
             const bearing = new THREE.Mesh(bearingGeo, matSilver);
             bearing.position.set(x, y, 0);
             bearing.rotation.z = angle;
-            group.add(bearing);
+            if (i > 0 && i < count - 1) {
+                group.add(bearing);
+            }
         }
         return group;
     }
