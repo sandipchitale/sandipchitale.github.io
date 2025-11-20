@@ -199,33 +199,38 @@
     // B. The Safe Yin/Yang Shape (Calculated Contour)
     function createTeardropShape(R, r_hole) {
         const shape = new THREE.Shape();
-
-        // Helper: Intersection of Small Circle (S-curve) and Hole Circle
-        // S-Circle Equation: x^2 + (y - Ry_center)^2 = (R/2)^2
-        // Hole Equation: x^2 + y^2 = r_hole^2
-
         const Rs = R / 2; // Radius of small circles
+        const rf = 0.15; // Fillet radius
 
-        // 1. Top Intersection (Top S-Curve & Hole)
-        // Center (0, Rs). Equation: x^2 + y^2 - 2*y*Rs + Rs^2 = Rs^2  => x^2 + y^2 - R*y = 0
-        // Sub hole: r_hole^2 - R*y = 0 => y = r_hole^2 / R
-        const y_top = (r_hole * r_hole) / R;
-        const x_top = -Math.sqrt(r_hole * r_hole - y_top * y_top); // Negative because Top S bulges Left
+        // Helper to find fillet center and angles
+        // Solves intersection of two circles centered at (0, y1) and (0, 0) with radii d1 and d2
+        // intersectionSign: -1 for Left (Top), 1 for Right (Bottom)
+        function getFilletData(y1, d1, d2, intersectionSign) {
+            // Solve for fillet center (fx, fy)
+            // x^2 + (y - y1)^2 = d1^2
+            // x^2 + y^2 = d2^2
+            
+            const fy = (y1 * y1 - d1 * d1 + d2 * d2) / (2 * y1);
+            const fx = intersectionSign * Math.sqrt(d2 * d2 - fy * fy);
+            
+            // Angles from centers to fillet center
+            const angleFromC1 = Math.atan2(fy - y1, fx);
+            const angleFromC2 = Math.atan2(fy, fx);
+            
+            return { fx, fy, angleFromC1, angleFromC2 };
+        }
 
-        // Angle on Top Small Circle (Center 0, Rs)
-        const angleTopEnd = Math.atan2(y_top - Rs, x_top - 0);
+        // 1. Top Fillet (Between Top S-Curve and Hole)
+        // Top S-Curve: Center (0, Rs). Material Inside. Tangent: Rs - rf.
+        // Hole: Center (0, 0). Material Outside. Tangent: r_hole + rf.
+        // Intersection is on the Left (-1).
+        const topFillet = getFilletData(Rs, Rs - rf, r_hole + rf, -1);
 
-        // 2. Bottom Intersection (Bottom S-Curve & Hole)
-        // Center (0, -Rs). y = -r_hole^2 / R
-        const y_bot = -(r_hole * r_hole) / R;
-        const x_bot = Math.sqrt(r_hole * r_hole - y_bot * y_bot); // Positive because Bottom S bulges Right (scoop)
-
-        // Angle on Bottom Small Circle (Center 0, -Rs)
-        const angleBotStart = Math.atan2(y_bot - (-Rs), x_bot - 0);
-
-        // 3. Angles on Hole Circle (Center 0,0)
-        const angleHoleStart = Math.atan2(y_top, x_top);
-        const angleHoleEnd = Math.atan2(y_bot, x_bot);
+        // 2. Bottom Fillet (Between Hole and Bottom S-Curve)
+        // Bottom S-Curve: Center (0, -Rs). Material Outside (Scoop). Tangent: Rs + rf (External).
+        // Hole: Center (0, 0). Material Outside. Tangent: r_hole + rf (External).
+        // Intersection is on the Right (1).
+        const botFillet = getFilletData(-Rs, Rs + rf, r_hole + rf, 1);
 
         // --- DRAW PATH ---
 
@@ -234,21 +239,40 @@
         shape.absarc(0, 0, R, -Math.PI / 2, Math.PI / 2, false);
 
         // 2. Top S-Curve (Head)
-        // From (0, R) to Top Intersection
+        // From (0, R) to Top Fillet Start
         // Center (0, Rs), Radius Rs.
-        // Standard starts at PI/2 (Top). Ends at angleTopEnd. CCW (false).
-        shape.absarc(0, Rs, Rs, Math.PI / 2, angleTopEnd, false);
+        // Start: PI/2. End: angleFromC1 of top fillet.
+        shape.absarc(0, Rs, Rs, Math.PI / 2, topFillet.angleFromC1, false);
 
-        // 3. Center Cutout Arc
-        // Connects Top Intersection to Bottom Intersection via the Hole boundary.
-        // We keep "Solid on Left", so we trace the hole Clockwise (true).
-        shape.absarc(0, 0, r_hole, angleHoleStart, angleHoleEnd, true);
+        // 3. Top Fillet
+        // Center (fx, fy), Radius rf.
+        // Start: angleFromC1 (Contact with S-curve).
+        // End: angleFromC2 + PI (Contact with Hole).
+        // CCW (false).
+        shape.absarc(topFillet.fx, topFillet.fy, rf, topFillet.angleFromC1, topFillet.angleFromC2 + Math.PI, false);
 
-        // 4. Bottom S-Curve (Tail Scoop)
-        // From Bottom Intersection to (0, -R).
+        // 4. Center Cutout Arc (Hole)
+        // From Top Fillet End to Bottom Fillet Start.
+        // Center (0,0), Radius r_hole.
+        // Start: topFillet.angleFromC2.
+        // End: botFillet.angleFromC2.
+        // CW (true).
+        shape.absarc(0, 0, r_hole, topFillet.angleFromC2, botFillet.angleFromC2, true);
+
+        // 5. Bottom Fillet
+        // Center (fx, fy), Radius rf.
+        // Start: angleFromC2 + PI (Contact with Hole).
+        // End: angleFromC1 + PI (Contact with S-curve).
+        // CCW (false).
+        shape.absarc(botFillet.fx, botFillet.fy, rf, botFillet.angleFromC2 + Math.PI, botFillet.angleFromC1 + Math.PI, false);
+
+        // 6. Bottom S-Curve (Tail Scoop)
+        // From Bottom Fillet End to (0, -R).
         // Center (0, -Rs), Radius Rs.
-        // Standard ends at -PI/2 (Bottom). Starts at angleBotStart. CW (true) to form scoop.
-        shape.absarc(0, -Rs, Rs, angleBotStart, -Math.PI / 2, true);
+        // Start: botFillet.angleFromC1.
+        // End: -PI/2.
+        // CW (true).
+        shape.absarc(0, -Rs, Rs, botFillet.angleFromC1, -Math.PI / 2, true);
 
         const geo = new THREE.ExtrudeGeometry(shape, {depth: shapeThickness, bevelEnabled: false});
         geo.translate(0, 0, -shapeThickness / 2);
