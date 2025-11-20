@@ -191,23 +191,10 @@
         </div>
 
         <div class="control-section">
-            <h3>Phase Control</h3>
-            <label>
-                Lag: <span class="value-display" id="lagValue">0</span>°
-            </label>
-            <input type="range" id="lagSlider" min="0" max="180" value="0" step="1">
-        </div>
-
-        <div class="control-section">
             <h3>Visibility</h3>
             <button id="toggleYin" class="success">Hide Yin Assembly</button>
             <button id="toggleYang" class="success">Hide Yang Assembly</button>
             <button id="toggleFrame" class="success">Hide Frame</button>
-        </div>
-
-        <div class="control-section">
-            <h3>Appearance</h3>
-            <button id="flipButton">Flip Yang Shape</button>
         </div>
 
         <div class="control-section">
@@ -480,8 +467,9 @@
                 const neckHeight = shapeThickness;  // Thin neck (0.15)
                 const stemHeight = shapeThickness;  // Thin stem (0.15)
 
-                const startAngle = -Math.PI / 2;
-                const endAngle = Math.PI / 2;
+                // Shortened arc to prevent clashing at intersections
+                const startAngle = -Math.PI / 2 + Math.PI / 18;  // -80° instead of -90°
+                const endAngle = Math.PI / 2 - Math.PI / 18;      // +80° instead of +90°
                 const segments = 64;
 
                 const geometry = new THREE.BufferGeometry();
@@ -721,10 +709,7 @@
             initControls() {
                 this.animationState = {
                     isPlaying: true,
-                    time: 0,
-                    lagDegrees: 0,
-                    lagRadians: 0,
-                    isFlipped: false
+                    time: 0
                 };
                 
                 this.visibility = {
@@ -746,9 +731,7 @@
                 if (this.animationState.isPlaying) {
                     this.animationState.time += CONFIG.rotationSpeed;
                     this.rotorYin.rotation.z = this.animationState.time;
-                    this.rotorYang.rotation.z = this.animationState.time + 
-                                                 this.animationState.lagRadians + 
-                                                 Math.PI / 2;
+                    this.rotorYang.rotation.z = this.animationState.time + Math.PI / 2;
                 }
 
                 this.renderer.render(this.scene, this.camera);
@@ -806,22 +789,6 @@
                         'Pause Animation' : 'Resume Animation';
                 });
 
-                // Lag slider
-                const lagSlider = document.getElementById('lagSlider');
-                const lagValue = document.getElementById('lagValue');
-                lagSlider.addEventListener('input', (e) => {
-                    this.animationState.lagDegrees = parseInt(e.target.value);
-                    this.animationState.lagRadians = this.animationState.lagDegrees * (Math.PI / 180);
-                    lagValue.textContent = this.animationState.lagDegrees;
-
-                    if (!this.animationState.isPlaying) {
-                        this.rotorYang.rotation.z = this.rotorYin.rotation.z + 
-                                                     this.animationState.lagRadians + 
-                                                     Math.PI / 2;
-                        this.renderer.render(this.scene, this.camera);
-                    }
-                });
-
                 // Visibility toggles
                 document.getElementById('toggleYin').addEventListener('click', (e) => {
                     this.visibility.yinAssembly = !this.visibility.yinAssembly;
@@ -846,18 +813,6 @@
                     e.target.textContent = this.visibility.frame ? 'Hide Frame' : 'Show Frame';
                     e.target.className = this.visibility.frame ? 'success' : '';
                     if (!this.animationState.isPlaying) this.renderer.render(this.scene, this.camera);
-                });
-
-                // Flip button
-                document.getElementById('flipButton').addEventListener('click', (e) => {
-                    this.animationState.isFlipped = !this.animationState.isFlipped;
-                    this.shapeYang.scale.y = this.animationState.isFlipped ? -1 : 1;
-                    e.target.textContent = this.animationState.isFlipped ? 
-                        'Un-Flip Yang Shape' : 'Flip Yang Shape';
-                    
-                    if (!this.animationState.isPlaying) {
-                        this.renderer.render(this.scene, this.camera);
-                    }
                 });
 
                 // Export buttons
