@@ -94,11 +94,19 @@
     <button id="flipBtn">Flip (Mirror)</button>
 
     <button id="toggleBtn" style="background: #2a662a; border-color:#484;">Pause Animation</button>
+
+    <div style="margin-top: 20px; border-top: 1px solid #555; padding-top: 10px;">
+        <label>3D Print Export:</label>
+        <button id="exportFrameBtn">Export Frame (STL)</button>
+        <button id="exportYinBtn">Export Yin Rotor (STL)</button>
+        <button id="exportYangBtn">Export Yang Rotor (STL)</button>
+    </div>
 </div>
 
 <script type="module">
     import * as THREE from 'three';
     import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+    import {STLExporter} from 'three/addons/exporters/STLExporter.js';
 
     // 1. SCENE SETUP
     const scene = new THREE.Scene();
@@ -129,7 +137,7 @@
     const splitTubeRadius = 0.08;
     const outerClampRadius = 0.36;
 
-    const shapeRadius = frameRadius - 0.1;
+    const shapeRadius = frameRadius - 0.35; // Reduced to 3.65 to prevent obscuration by square frame
     const shapeThickness = 0.15; // Slightly thicker for visibility
     const centerHoleRadius = 0.35; // Size of the central "ark" cutout
 
@@ -156,71 +164,87 @@
     // 4. GEOMETRY FUNCTIONS
 
     // A. The "Gapped" Frame
-    // A. The "Gapped" Frame (Grooved Torus via Lathe)
+    // A. The "Gapped" Frame (Square Profile with T-Slot via Lathe)
     function createGappedFrame(radius) {
         const group = new THREE.Group();
 
-        // Define the profile for LatheGeometry
+        // Define the profile for LatheGeometry (Square Cross-Section with T-Slot)
         // The Lathe revolves around the Y axis.
         // The profile is defined in the XY plane.
-        // X corresponds to the radial distance from the center of the torus.
-        // Y corresponds to the vertical thickness of the torus.
-        
-        const R_tube = outerClampRadius; // 0.36
-        const grooveWidth = 0.14;
-        const grooveDepth = 0.15; // X coordinate of the back wall (relative to tube center)
-        const h = grooveWidth / 2;
-        
-        // Center of the tube profile is at x = radius
+
+        // Dimensions for Square Profile
+        const frameThickness = 0.5; // Total thickness (height)
+        const frameWidth = 0.5;     // Total width (radial)
+        const halfThick = frameThickness / 2;
+        const halfWidth = frameWidth / 2;
+
+        // Center of the tube profile is at x = radius (4.0)
         const cx = radius;
+
+        // Groove Dimensions (T-Slot)
+        // Mouth (Opening)
+        const mouthWidth = 0.14;
+        const hMouth = mouthWidth / 2;
         
-        // Calculate intersection X relative to tube center
-        // x^2 + h^2 = R_tube^2 => x = -sqrt(R^2 - h^2) (Inner side)
-        const xi = -Math.sqrt(R_tube * R_tube - h * h);
+        // Chamber (Internal Cavity)
+        const chamberWidth = 0.24;
+        const hChamber = chamberWidth / 2;
+        const chamberDepth = 0.15; // Depth from inner face to back wall
+        const chamberStartDepth = 0.05; // Depth from inner face where chamber starts (lip thickness)
+
+        // Inner Face X: cx - halfWidth
+        const xInner = cx - halfWidth;
+        // Outer Face X: cx + halfWidth
+        const xOuter = cx + halfWidth;
         
+        // T-Slot X Coordinates
+        const xChamberStart = xInner + chamberStartDepth;
+        const xChamberBack = xInner + chamberDepth;
+
         const points = [];
-        
-        // 1. Start at Top-Inner Lip
-        points.push(new THREE.Vector2(cx + xi, h));
-        
-        // 2. Go IN to Back Wall Top
-        points.push(new THREE.Vector2(cx + grooveDepth, h));
-        
-        // 3. Go DOWN to Back Wall Bottom
-        points.push(new THREE.Vector2(cx + grooveDepth, -h));
-        
-        // 4. Go OUT to Bottom-Inner Lip
-        points.push(new THREE.Vector2(cx + xi, -h));
-        
-        // 5. Arc from Bottom-Inner Lip to Top-Inner Lip (Counter-Clockwise)
-        // We need to generate points along the circle.
-        const startAngle = Math.atan2(-h, xi);
-        const endAngle = Math.atan2(h, xi);
-        
-        // We want to go from startAngle to endAngle the LONG way (Counter-Clockwise).
-        // startAngle is approx -168 deg (-2.9 rad).
-        // endAngle is approx 168 deg (2.9 rad).
-        // To go CCW, we go -2.9 -> ... -> 0 -> ... -> 2.9.
-        // Wait, atan2 returns -PI to PI.
-        // If we go CCW from -2.9 to 2.9, we cross 0. That's the RIGHT side (Outer side).
-        // That is correct. The "Inner" side is the groove (Left side).
-        
-        const segments = 32;
-        for (let i = 1; i <= segments; i++) {
-            const t = i / segments;
-            // Ensure we go the long way if needed? 
-            // -2.9 to 2.9 is 5.8 radians. That's the long way.
-            // The short way (across the gap) would be 2.9 to -2.9 (crossing PI).
-            // So simple lerp works.
-            const angle = startAngle + t * (endAngle - startAngle);
-            const px = cx + R_tube * Math.cos(angle);
-            const py = R_tube * Math.sin(angle);
-            points.push(new THREE.Vector2(px, py));
-        }
-        
+
+        // 1. Top-Inner Lip (Start at top of groove mouth)
+        points.push(new THREE.Vector2(xInner, hMouth));
+
+        // 2. Step IN to Chamber Front Top
+        points.push(new THREE.Vector2(xChamberStart, hMouth));
+
+        // 3. Step UP to Chamber Top
+        points.push(new THREE.Vector2(xChamberStart, hChamber));
+
+        // 4. Step IN to Chamber Back Top
+        points.push(new THREE.Vector2(xChamberBack, hChamber));
+
+        // 5. Step DOWN to Chamber Back Bottom
+        points.push(new THREE.Vector2(xChamberBack, -hChamber));
+
+        // 6. Step OUT to Chamber Front Bottom
+        points.push(new THREE.Vector2(xChamberStart, -hChamber));
+
+        // 7. Step DOWN to Mouth Bottom
+        points.push(new THREE.Vector2(xChamberStart, -hMouth));
+
+        // 8. Step OUT to Bottom-Inner Lip
+        points.push(new THREE.Vector2(xInner, -hMouth));
+
+        // 9. Go DOWN to Bottom-Inner Corner
+        points.push(new THREE.Vector2(xInner, -halfThick));
+
+        // 10. Go RIGHT to Bottom-Outer Corner
+        points.push(new THREE.Vector2(xOuter, -halfThick));
+
+        // 11. Go UP to Top-Outer Corner
+        points.push(new THREE.Vector2(xOuter, halfThick));
+
+        // 12. Go LEFT to Top-Inner Corner
+        points.push(new THREE.Vector2(xInner, halfThick));
+
+        // 13. Close loop (Go DOWN to Top-Inner Lip)
+        points.push(new THREE.Vector2(xInner, hMouth));
+
         // Create LatheGeometry
         const geometry = new THREE.LatheGeometry(points, 128); // 128 segments for smooth torus
-        
+
         // Lathe creates a torus with axis Y.
         // Standard TorusGeometry has axis Z.
         // We need to rotate X by 90 deg to match Torus orientation (Hole along Z).
@@ -323,27 +347,87 @@
         return new THREE.Mesh(geo, null);
     }
 
-    // C. The Bearings
+    // C. The Bearings (Captive Studs)
     function createBearingArc(radius, count, material) {
         const group = new THREE.Group();
-        const bearingGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 16);
-        bearingGeo.rotateX(Math.PI / 2);
+        
+        // Bearing Dimensions
+        const headRadius = 0.10; // Fits in 0.24 chamber
+        const headHeight = 0.10;
+        const neckRadius = 0.06; // Fits in 0.14 mouth
+        
+        // Distance from Frame Center (radius=4.0) to Rotor Edge (3.65)
+        // We need to bridge this gap.
+        // The bearing center is at 'radius'.
+        // The "Head" is centered at 'radius'.
+        // The "Stem" needs to go from 'radius' inwards to 'shapeRadius' (3.65).
+        // Total stem length = radius - shapeRadius = 0.35.
+        // Actually, let's make it slightly longer to penetrate the rotor for solid connection.
+        const stemLength = (radius - shapeRadius) + 0.05; 
+
+        const headGeo = new THREE.CylinderGeometry(headRadius, headRadius, headHeight, 16);
+        headGeo.rotateX(Math.PI / 2); // Align with radial direction (Z in local bearing space)
+        
+        const stemGeo = new THREE.CylinderGeometry(neckRadius, neckRadius, stemLength, 16);
+        stemGeo.rotateX(Math.PI / 2);
+        // Shift stem so it starts at center and goes inwards (negative Z in local space? No, we rotate the whole thing)
+        // Let's build it in local coordinates where Z is the radial axis.
+        // Head is at Z=0.
+        // Stem extends from Z=0 to Z=-stemLength.
+        stemGeo.translate(0, 0, -stemLength / 2);
+
         const startAngle = -Math.PI / 2;
         const endAngle = Math.PI / 2;
 
         for (let i = 0; i < count; i++) {
             const t = i / (count - 1);
             const angle = startAngle + t * (endAngle - startAngle);
+            
+            // Position on the circle
             const x = radius * Math.cos(angle);
             const y = radius * Math.sin(angle);
 
             const dist = Math.sqrt(x * x + y * y);
             if (dist > centerHoleRadius + 0.3) {
-                const bearing = new THREE.Mesh(bearingGeo, material);
-                bearing.position.set(x, y, 0);
-                bearing.rotation.z = angle;
+                const bearingGroup = new THREE.Group();
+                
+                const head = new THREE.Mesh(headGeo, material);
+                const stem = new THREE.Mesh(stemGeo, material);
+                
+                bearingGroup.add(head);
+                bearingGroup.add(stem);
+                
+                // Position the group on the ring
+                bearingGroup.position.set(x, y, 0);
+                
+                // Rotate so the stem points INWARDS (towards center)
+                // The stem geometry extends along negative Z.
+                // If we rotate Z by 'angle', the local X/Y axes rotate.
+                // We need the local Z axis to point OUTWARDS (so negative Z points INWARDS).
+                // Standard rotation.z = angle aligns local X with tangent? No.
+                // Let's check standard orientation.
+                bearingGroup.rotation.z = angle;
+                // At angle=0 (Right), x=R, y=0. Local Z points out of screen? No.
+                // We need to orient the cylinder axis (which is Z after rotateX(PI/2)?)
+                // Wait, Cylinder default is Y axis. rotateX(PI/2) makes it Z axis.
+                // So Head and Stem are along Z axis.
+                // We want this Z axis to align with the radial vector (cos(angle), sin(angle)).
+                // At angle=0, radial vector is (1,0,0).
+                // We need to rotate the group so its Z axis points to (1,0,0).
+                // By default Z is (0,0,1).
+                // Rotate Y by PI/2 -> Z becomes X.
+                bearingGroup.rotateY(Math.PI / 2); 
+                // Now Z axis is along World X.
+                // Then rotate around World Z by 'angle'.
+                // But we are inside a group that might be rotated? No, this is local to the arc.
+                
+                // Simpler approach: LookAt.
+                // Position is at (x,y,0).
+                // Look at (2*x, 2*y, 0) -> Points Z axis outwards.
+                bearingGroup.lookAt(2*x, 2*y, 0);
+
                 if (i > 0 && i < count - 1) {
-                    group.add(bearing);
+                    group.add(bearingGroup);
                 }
             }
         }
@@ -433,6 +517,47 @@
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // 8. EXPORT LOGIC
+    const exporter = new STLExporter();
+
+    function exportToSTL(object, filename) {
+        const result = exporter.parse(object, { binary: true });
+        const blob = new Blob([result], { type: 'application/octet-stream' });
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    document.getElementById('exportFrameBtn').addEventListener('click', () => {
+        // Create a clean instance for export (no rotation)
+        const exportFrame = createGappedFrame(frameRadius);
+        exportToSTL(exportFrame, 'gimbal_frame.stl');
+    });
+
+    document.getElementById('exportYinBtn').addEventListener('click', () => {
+        // Recreate Yin Rotor in neutral position
+        const exportRotor = new THREE.Group();
+        const shape = createTeardropShape(shapeRadius, centerHoleRadius);
+        shape.material = matYinWhite; // Material doesn't matter for STL but keeps logic consistent
+        exportRotor.add(shape);
+        exportRotor.add(createBearingArc(frameRadius, 9, matYinWhite));
+        exportToSTL(exportRotor, 'gimbal_yin_rotor.stl');
+    });
+
+    document.getElementById('exportYangBtn').addEventListener('click', () => {
+        // Recreate Yang Rotor in neutral position
+        const exportRotor = new THREE.Group();
+        const shape = createTeardropShape(shapeRadius, centerHoleRadius);
+        shape.material = matYangBlack;
+        exportRotor.add(shape);
+        exportRotor.add(createBearingArc(frameRadius, 9, matYangBlack));
+        exportToSTL(exportRotor, 'gimbal_yang_rotor.stl');
     });
 </script>
 </body>
