@@ -86,11 +86,6 @@
     </script>
 </head>
 <body>
-<div id="info">
-    <h2>Encased Intersection Gimbal</h2>
-    <p>Fixed: Valid Geometry • Central Clearance Arcs</p>
-</div>
-
 <div id="controls">
     <label for="phaseSlider">Lag: <span id="phaseVal" class="highlight">0</span> degrees</label>
     <input type="range" id="phaseSlider" min="0" max="180" value="0" step="1">
@@ -161,37 +156,78 @@
     // 4. GEOMETRY FUNCTIONS
 
     // A. The "Gapped" Frame
+    // A. The "Gapped" Frame (Grooved Torus via Lathe)
     function createGappedFrame(radius) {
         const group = new THREE.Group();
 
-        // Internal Split Rails
-        const arcLength = Math.PI - intersectionGap;
-        const start1 = intersectionGap / 2;
-        const start2 = Math.PI + intersectionGap / 2;
-
-        function buildRail(zOffset) {
-            const railGroup = new THREE.Group();
-            const geo1 = new THREE.TorusGeometry(radius, splitTubeRadius, 16, 64, arcLength);
-            geo1.rotateZ(start1);
-            const mesh1 = new THREE.Mesh(geo1, matWhite);
-            mesh1.position.z = zOffset;
-            railGroup.add(mesh1);
-
-            const geo2 = new THREE.TorusGeometry(radius, splitTubeRadius, 16, 64, arcLength);
-            geo2.rotateZ(start2);
-            const mesh2 = new THREE.Mesh(geo2, matWhite);
-            mesh2.position.z = zOffset;
-            railGroup.add(mesh2);
-            return railGroup;
+        // Define the profile for LatheGeometry
+        // The Lathe revolves around the Y axis.
+        // The profile is defined in the XY plane.
+        // X corresponds to the radial distance from the center of the torus.
+        // Y corresponds to the vertical thickness of the torus.
+        
+        const R_tube = outerClampRadius; // 0.36
+        const grooveWidth = 0.14;
+        const grooveDepth = 0.15; // X coordinate of the back wall (relative to tube center)
+        const h = grooveWidth / 2;
+        
+        // Center of the tube profile is at x = radius
+        const cx = radius;
+        
+        // Calculate intersection X relative to tube center
+        // x^2 + h^2 = R_tube^2 => x = -sqrt(R^2 - h^2) (Inner side)
+        const xi = -Math.sqrt(R_tube * R_tube - h * h);
+        
+        const points = [];
+        
+        // 1. Start at Top-Inner Lip
+        points.push(new THREE.Vector2(cx + xi, h));
+        
+        // 2. Go IN to Back Wall Top
+        points.push(new THREE.Vector2(cx + grooveDepth, h));
+        
+        // 3. Go DOWN to Back Wall Bottom
+        points.push(new THREE.Vector2(cx + grooveDepth, -h));
+        
+        // 4. Go OUT to Bottom-Inner Lip
+        points.push(new THREE.Vector2(cx + xi, -h));
+        
+        // 5. Arc from Bottom-Inner Lip to Top-Inner Lip (Counter-Clockwise)
+        // We need to generate points along the circle.
+        const startAngle = Math.atan2(-h, xi);
+        const endAngle = Math.atan2(h, xi);
+        
+        // We want to go from startAngle to endAngle the LONG way (Counter-Clockwise).
+        // startAngle is approx -168 deg (-2.9 rad).
+        // endAngle is approx 168 deg (2.9 rad).
+        // To go CCW, we go -2.9 -> ... -> 0 -> ... -> 2.9.
+        // Wait, atan2 returns -PI to PI.
+        // If we go CCW from -2.9 to 2.9, we cross 0. That's the RIGHT side (Outer side).
+        // That is correct. The "Inner" side is the groove (Left side).
+        
+        const segments = 32;
+        for (let i = 1; i <= segments; i++) {
+            const t = i / segments;
+            // Ensure we go the long way if needed? 
+            // -2.9 to 2.9 is 5.8 radians. That's the long way.
+            // The short way (across the gap) would be 2.9 to -2.9 (crossing PI).
+            // So simple lerp works.
+            const angle = startAngle + t * (endAngle - startAngle);
+            const px = cx + R_tube * Math.cos(angle);
+            const py = R_tube * Math.sin(angle);
+            points.push(new THREE.Vector2(px, py));
         }
+        
+        // Create LatheGeometry
+        const geometry = new THREE.LatheGeometry(points, 128); // 128 segments for smooth torus
+        
+        // Lathe creates a torus with axis Y.
+        // Standard TorusGeometry has axis Z.
+        // We need to rotate X by 90 deg to match Torus orientation (Hole along Z).
+        geometry.rotateX(Math.PI / 2);
 
-        group.add(buildRail(splitGap / 2 + splitTubeRadius / 2));
-        group.add(buildRail(-(splitGap / 2 + splitTubeRadius / 2)));
-
-        // Outer Wrapper (Glass)
-        const glassGeo = new THREE.TorusGeometry(radius, outerClampRadius, 24, 100, Math.PI * 2);
-        const glassMesh = new THREE.Mesh(glassGeo, matGlass);
-        group.add(glassMesh);
+        const mesh = new THREE.Mesh(geometry, matGlass);
+        group.add(mesh);
 
         return group;
     }
