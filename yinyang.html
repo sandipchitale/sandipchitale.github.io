@@ -48,7 +48,7 @@
 
         #controls {
             position: absolute;
-            top: 80px;
+            top: 20px;
             right: 20px;
             width: 280px;
             background: rgba(0, 0, 0, 0.7);
@@ -58,6 +58,40 @@
             color: #fff;
             z-index: 10;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        #controls.collapsed {
+            transform: translateX(calc(100% + 20px));
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #controls-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 11;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        #controls-toggle:hover {
+            background: rgba(0, 0, 0, 0.85);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: scale(1.1);
         }
 
         .control-section {
@@ -184,7 +218,9 @@
     </script>
 </head>
 <body>
-    <div id="controls">
+    <button id="controls-toggle" title="Toggle Controls">☰</button>
+    
+    <div id="controls" class="collapsed">
         <div class="control-section">
             <h3>Animation</h3>
             <button id="toggleAnimation" class="primary">Pause Animation</button>
@@ -782,6 +818,15 @@
             // ========================================================================
 
             setupEventListeners() {
+                // Controls toggle
+                const controlsToggle = document.getElementById('controls-toggle');
+                const controls = document.getElementById('controls');
+                
+                controlsToggle.addEventListener('click', () => {
+                    controls.classList.toggle('collapsed');
+                    controlsToggle.textContent = controls.classList.contains('collapsed') ? '☰' : '✕';
+                });
+
                 // Animation toggle
                 document.getElementById('toggleAnimation').addEventListener('click', (e) => {
                     this.animationState.isPlaying = !this.animationState.isPlaying;
