@@ -274,6 +274,14 @@
         // CW (true).
         shape.absarc(0, -Rs, Rs, botFillet.angleFromC1, -Math.PI / 2, true);
 
+        // 7. The "Dot" (Hole in the Head)
+        // Center: (0, Rs) -> Center of the Top S-Curve
+        // Radius: Let's say Rs / 3.5 for a good proportion
+        const dotRadius = Rs / 3.5;
+        const dotPath = new THREE.Path();
+        dotPath.absarc(0, Rs, dotRadius, 0, Math.PI * 2, true); // CW for hole
+        shape.holes.push(dotPath);
+
         const geo = new THREE.ExtrudeGeometry(shape, {depth: shapeThickness, bevelEnabled: false});
         geo.translate(0, 0, -shapeThickness / 2);
         return new THREE.Mesh(geo, null);
