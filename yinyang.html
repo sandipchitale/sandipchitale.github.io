@@ -145,9 +145,9 @@
         color: 0xaaccff,
         metalness: 0.1,
         roughness: 0.05,
-        transmission: 0.95,
+        transmission: 0.5, // Reduced from 0.95 for less translucency
         transparent: true,
-        opacity: 0.3,
+        opacity: 0.5,      // Increased from 0.3 for more visibility
         side: THREE.DoubleSide,
         clearcoat: 1.0,
         clearcoatRoughness: 0.1
@@ -324,7 +324,7 @@
     }
 
     // C. The Bearings
-    function createBearingArc(radius, count) {
+    function createBearingArc(radius, count, material) {
         const group = new THREE.Group();
         const bearingGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 16);
         bearingGeo.rotateX(Math.PI / 2);
@@ -339,7 +339,7 @@
 
             const dist = Math.sqrt(x * x + y * y);
             if (dist > centerHoleRadius + 0.3) {
-                const bearing = new THREE.Mesh(bearingGeo, matSilver);
+                const bearing = new THREE.Mesh(bearingGeo, material);
                 bearing.position.set(x, y, 0);
                 bearing.rotation.z = angle;
                 if (i > 0 && i < count - 1) {
@@ -361,7 +361,7 @@
     const shapeP = createTeardropShape(shapeRadius, centerHoleRadius);
     shapeP.material = matYinWhite;
     rotorP.add(shapeP);
-    rotorP.add(createBearingArc(frameRadius, 9));
+    rotorP.add(createBearingArc(frameRadius, 9, matYinWhite));
     rotorP.rotation.y = Math.PI / 2;
     scene.add(rotorP);
 
@@ -375,7 +375,7 @@
     const shapeO = createTeardropShape(shapeRadius, centerHoleRadius);
     shapeO.material = matYangBlack;
     rotorO.add(shapeO);
-    rotorO.add(createBearingArc(frameRadius, 9));
+    rotorO.add(createBearingArc(frameRadius, 9, matYangBlack));
 
     rotorO.rotation.x = Math.PI / 2;
     rotorO.rotation.z = Math.PI / 2;
