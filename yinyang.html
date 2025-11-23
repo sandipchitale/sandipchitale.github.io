@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Encased Intersection Gimbal</title>
+n    <title>Yin Yang T-slot Gimbal</title>
     <style>
         * {
             margin: 0;
@@ -304,19 +304,25 @@
                 this.scene = new THREE.Scene();
                 this.scene.background = new THREE.Color(0x222222);
 
-                // Camera
+                // Camera - optimized near/far for better depth precision
                 this.camera = new THREE.PerspectiveCamera(
                     45,
                     window.innerWidth / window.innerHeight,
-                    0.1,
-                    1000
+                    1,
+                    100
                 );
                 this.camera.position.set(12, 10, 12);
 
-                // Renderer
-                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                // Renderer - enable logarithmic depth buffer to fix z-fighting
+                this.renderer = new THREE.WebGLRenderer({ 
+                    antialias: true,
+                    logarithmicDepthBuffer: true,
+                    powerPreference: 'high-performance'
+                });
+                // Enable shadow map for better depth perception (helps reduce shimmer)
+                this.renderer.shadowMap.enabled = false; // Keep disabled for performance
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2 to avoid over-sampling artifacts
                 document.getElementById('canvas-container').appendChild(this.renderer.domElement);
 
                 // Orbit controls
@@ -343,17 +349,15 @@
 
             initMaterials() {
                 this.materials = {
-                    glass: new THREE.MeshPhysicalMaterial({
-                        color: 0xffffff,
-                        metalness: 0.0,
-                        roughness: 0.05,
-                        transmission: 0.95,
+                    glass: new THREE.MeshStandardMaterial({
+                        color: 0xccddff,
+                        metalness: 0.1,
+                        roughness: 0.1,
                         transparent: true,
-                        opacity: 0.3,
+                        opacity: 0.15,
                         side: THREE.DoubleSide,
-                        clearcoat: 1.0,
-                        clearcoatRoughness: 0.05,
-                        ior: 1.5
+                        depthWrite: false,
+                        premultipliedAlpha: true
                     }),
                     yinWhite: new THREE.MeshStandardMaterial({
                         color: 0xf0f0f0,
@@ -371,17 +375,23 @@
                     }),
                     yinRail: new THREE.MeshStandardMaterial({
                         color: 0xf0f0f0,
-                        roughness: 0.9,
-                        metalness: 0.0,
+                        roughness: 0.7,
+                        metalness: 0.2,
                         side: THREE.DoubleSide,
-                        flatShading: false
+                        flatShading: false,
+                        polygonOffset: true,
+                        polygonOffsetFactor: 0.5,
+                        polygonOffsetUnits: 0.5
                     }),
                     yangRail: new THREE.MeshStandardMaterial({
                         color: 0x1a1a1a,
-                        roughness: 0.9,
-                        metalness: 0.0,
+                        roughness: 0.7,
+                        metalness: 0.2,
                         side: THREE.DoubleSide,
-                        flatShading: false
+                        flatShading: false,
+                        polygonOffset: true,
+                        polygonOffsetFactor: 0.5,
+                        polygonOffsetUnits: 0.5
                     })
                 };
             }
@@ -480,226 +490,111 @@
             createBearingArc(material) {
                 const { frameRadius, shapeRadius, tSlotMouthWidth, tSlotChamberWidth, shapeThickness } = CONFIG;
 
-                // T-shaped rail dimensions (matches the T-slot in the frame)
-                // The rail fits INTO the slot, so dimensions are slightly smaller for clearance
-                const clearance = 0.02; // Small gap for sliding fit
+                // Simplified T-rail using separate components to avoid shimmering
+                const clearance = 0.02;
+                const group = new THREE.Group();
                 
-                // Neck (fits through the mouth opening) - THIN, matches shape thickness
+                // Arc parameters
+                const startAngle = -Math.PI / 2 + Math.PI / 18;
+                const endAngle = Math.PI / 2 - Math.PI / 18;
+                const segments = 128; // Reduced segments for cleaner geometry
+                
+                // Dimensions
+                const headWidth = tSlotChamberWidth - clearance;
+                const headHeight = 0.25;
+                const headDepth = 0.15;
+                
                 const neckWidth = tSlotMouthWidth - clearance;
-                const neckDepth = 0.12; // Depth of the neck portion
+                const neckHeight = shapeThickness;
+                const neckDepth = 0.12;
                 
-                // Head (fits in the chamber, prevents pull-out) - THICK AND WIDE
-                const headWidth = tSlotChamberWidth - clearance; // Almost fills the chamber
-                const headDepth = 0.15; // Thicker head for prominence
-                
-                // Stem (extends from slot to rotor) - THIN, matches shape thickness
-                const stemWidth = shapeThickness; // Same as yin/yang shape thickness (0.15)
+                const stemWidth = shapeThickness;
+                const stemHeight = shapeThickness;
                 const totalRailDepth = (frameRadius - shapeRadius) + 0.05;
                 const stemDepth = totalRailDepth - neckDepth - headDepth;
                 
-                // Height (perpendicular to radial direction)
-                // Only the HEAD is tall, neck and stem match shape thickness
-                const headHeight = 0.25;      // Tall head
-                const neckHeight = shapeThickness;  // Thin neck (0.15)
-                const stemHeight = shapeThickness;  // Thin stem (0.15)
-
-                // Shortened arc to prevent clashing at intersections
-                const startAngle = -Math.PI / 2 + Math.PI / 18;  // -80° instead of -90°
-                const endAngle = Math.PI / 2 - Math.PI / 18;      // +80° instead of +90°
-                const segments = 64;
-
-                const geometry = new THREE.BufferGeometry();
-                const vertices = [];
-                const indices = [];
-
-                // Create vertices for the T-shaped rail
-                // For each segment, we create vertices for the T-profile at different radial depths
-                for (let i = 0; i <= segments; i++) {
-                    const t = i / segments;
-                    const angle = startAngle + t * (endAngle - startAngle);
-                    
-                    const cos = Math.cos(angle);
-                    const sin = Math.sin(angle);
-                    
-                    // Tangent direction (perpendicular to radial)
-                    const tangentX = -sin;
-                    const tangentY = cos;
-                    
-                    // Define radial positions (from outer to inner)
-                    const r0 = frameRadius; // Outer edge (at frame)
-                    const r1 = frameRadius - headDepth; // End of head
-                    const r2 = frameRadius - headDepth - neckDepth; // End of neck
-                    const r3 = frameRadius - totalRailDepth; // Inner edge (at rotor)
-                    
-                    // For each radial position, calculate the width at that point
-                    // Head section (r0 to r1): wide
-                    const hw0 = headWidth / 2;
-                    const hw1 = headWidth / 2;
-                    const hh0 = headHeight / 2;  // Tall head
-                    const hh1 = headHeight / 2;
-                    
-                    // Neck section (r1 to r2): narrow
-                    const hw2 = neckWidth / 2;
-                    const hh2 = neckHeight / 2;  // Thin neck
-                    
-                    // Stem section (r2 to r3): thin like shape
-                    const hw3 = stemWidth / 2;
-                    const hh3 = stemHeight / 2;  // Thin stem
-                    
-                    // Calculate positions for each section
-                    // Section 0: Head outer edge (at frame)
-                    const x0 = r0 * cos;
-                    const y0 = r0 * sin;
-                    
-                    // Section 1: Head inner edge
-                    const x1 = r1 * cos;
-                    const y1 = r1 * sin;
-                    
-                    // Section 2: Neck inner edge
-                    const x2 = r2 * cos;
-                    const y2 = r2 * sin;
-                    
-                    // Section 3: Stem inner edge (at rotor)
-                    const x3 = r3 * cos;
-                    const y3 = r3 * sin;
-                    
-                    // Create vertices for T-profile
-                    // Each section has 4 vertices (top-left, top-right, bottom-right, bottom-left)
-                    
-                    // Head outer (4 vertices) - TALL
-                    vertices.push(
-                        x0 - tangentX * hw0, y0 - tangentY * hw0, hh0,  // Top-left
-                        x0 + tangentX * hw0, y0 + tangentY * hw0, hh0,  // Top-right
-                        x0 + tangentX * hw0, y0 + tangentY * hw0, -hh0, // Bottom-right
-                        x0 - tangentX * hw0, y0 - tangentY * hw0, -hh0  // Bottom-left
-                    );
-                    
-                    // Head inner (4 vertices) - TALL
-                    vertices.push(
-                        x1 - tangentX * hw1, y1 - tangentY * hw1, hh1,
-                        x1 + tangentX * hw1, y1 + tangentY * hw1, hh1,
-                        x1 + tangentX * hw1, y1 + tangentY * hw1, -hh1,
-                        x1 - tangentX * hw1, y1 - tangentY * hw1, -hh1
-                    );
-                    
-                    // Neck inner (4 vertices) - THIN
-                    vertices.push(
-                        x2 - tangentX * hw2, y2 - tangentY * hw2, hh2,
-                        x2 + tangentX * hw2, y2 + tangentY * hw2, hh2,
-                        x2 + tangentX * hw2, y2 + tangentY * hw2, -hh2,
-                        x2 - tangentX * hw2, y2 - tangentY * hw2, -hh2
-                    );
-                    
-                    // Stem inner (4 vertices) - THIN
-                    vertices.push(
-                        x3 - tangentX * hw3, y3 - tangentY * hw3, hh3,
-                        x3 + tangentX * hw3, y3 + tangentY * hw3, hh3,
-                        x3 + tangentX * hw3, y3 + tangentY * hw3, -hh3,
-                        x3 - tangentX * hw3, y3 - tangentY * hw3, -hh3
-                    );
-                }
-
-                // Create faces connecting the segments
-                const vertsPerSegment = 16; // 4 sections × 4 vertices each
+                // Create curve path for the arc
+                const curve = new THREE.EllipseCurve(
+                    0, 0,            // center
+                    frameRadius, frameRadius,  // x radius, y radius
+                    startAngle, endAngle,      // start angle, end angle
+                    false,           // clockwise
+                    0                // rotation
+                );
                 
-                for (let i = 0; i < segments; i++) {
-                    const base = i * vertsPerSegment;
-                    const next = (i + 1) * vertsPerSegment;
-                    
-                    // Helper function to create a quad face
-                    const quad = (a, b, c, d) => {
-                        indices.push(a, b, c);
-                        indices.push(a, c, d);
-                    };
-                    
-                    // Head section (vertices 0-7)
-                    quad(base + 0, next + 0, next + 1, base + 1); // Top
-                    quad(base + 1, next + 1, next + 2, base + 2); // Right
-                    quad(base + 2, next + 2, next + 3, base + 3); // Bottom
-                    quad(base + 3, next + 3, next + 0, base + 0); // Left
-                    
-                    quad(base + 4, base + 5, next + 5, next + 4); // Top (inner)
-                    quad(base + 5, base + 6, next + 6, next + 5); // Right (inner)
-                    quad(base + 6, base + 7, next + 7, next + 6); // Bottom (inner)
-                    quad(base + 7, base + 4, next + 4, next + 7); // Left (inner)
-                    
-                    // Radial faces connecting outer to inner of head
-                    quad(base + 0, base + 4, next + 4, next + 0); // Top radial
-                    quad(base + 1, base + 5, next + 5, next + 1); // Right radial
-                    quad(base + 2, base + 6, next + 6, next + 2); // Bottom radial
-                    quad(base + 3, base + 7, next + 7, next + 3); // Left radial
-                    
-                    // Transition from head to neck (fill the step)
-                    // Top transition
-                    quad(base + 4, next + 4, next + 8, base + 8);
-                    // Right transition
-                    quad(base + 5, next + 5, next + 9, base + 9);
-                    // Bottom transition
-                    quad(base + 6, next + 6, next + 10, base + 10);
-                    // Left transition
-                    quad(base + 7, next + 7, next + 11, base + 11);
-                    
-                    // Neck section (vertices 8-11)
-                    quad(base + 8, next + 8, next + 9, base + 9); // Top
-                    quad(base + 9, next + 9, next + 10, base + 10); // Right
-                    quad(base + 10, next + 10, next + 11, base + 11); // Bottom
-                    quad(base + 11, next + 11, next + 8, base + 8); // Left
-                    
-                    // Transition from neck to stem (fill the step)
-                    // Top transition
-                    quad(base + 8, next + 8, next + 12, base + 12);
-                    // Right transition
-                    quad(base + 9, next + 9, next + 13, base + 13);
-                    // Bottom transition
-                    quad(base + 10, next + 10, next + 14, base + 14);
-                    // Left transition
-                    quad(base + 11, next + 11, next + 15, base + 15);
-                    
-                    // Stem section (vertices 12-15)
-                    quad(base + 12, next + 12, next + 13, base + 13); // Top
-                    quad(base + 13, next + 13, next + 14, base + 14); // Right
-                    quad(base + 14, next + 14, next + 15, base + 15); // Bottom
-                    quad(base + 15, next + 15, next + 12, base + 12); // Left
-                }
-
-                // Cap the ends
-                const capQuad = (a, b, c, d) => {
-                    indices.push(a, b, c);
-                    indices.push(a, c, d);
-                };
+                const points = curve.getPoints(segments);
+                const curvePath = new THREE.CatmullRomCurve3(
+                    points.map(p => new THREE.Vector3(p.x, p.y, 0))
+                );
                 
-                // Start cap (complex T-shape)
-                const s = 0;
-                capQuad(s + 0, s + 3, s + 7, s + 4); // Head left side
-                capQuad(s + 4, s + 7, s + 11, s + 8); // Neck left side
-                capQuad(s + 8, s + 11, s + 15, s + 12); // Stem left side
-                capQuad(s + 12, s + 15, s + 14, s + 13); // Stem bottom
-                capQuad(s + 13, s + 14, s + 10, s + 9); // Stem right + Neck right
-                capQuad(s + 9, s + 10, s + 6, s + 5); // Neck right to Head right
-                capQuad(s + 5, s + 6, s + 2, s + 1); // Head right side
-                capQuad(s + 1, s + 2, s + 3, s + 0); // Head top
-                capQuad(s + 0, s + 4, s + 8, s + 12); // Connect tops
-                capQuad(s + 0, s + 12, s + 13, s + 1); // Top surface
+                // Create three separate tubes for head, neck, and stem
+                // This avoids the complex geometry that causes shimmering
                 
-                // End cap (reverse winding)
-                const e = segments * vertsPerSegment;
-                capQuad(e + 0, e + 4, e + 7, e + 3);
-                capQuad(e + 4, e + 8, e + 11, e + 7);
-                capQuad(e + 8, e + 12, e + 15, e + 11);
-                capQuad(e + 12, e + 13, e + 14, e + 15);
-                capQuad(e + 13, e + 9, e + 10, e + 14);
-                capQuad(e + 9, e + 5, e + 6, e + 10);
-                capQuad(e + 5, e + 1, e + 2, e + 6);
-                capQuad(e + 1, e + 0, e + 3, e + 2);
-                capQuad(e + 0, e + 12, e + 8, e + 4);
-                capQuad(e + 0, e + 1, e + 13, e + 12);
-
-                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-                geometry.setIndex(indices);
-                geometry.computeVertexNormals();
-
-                const mesh = new THREE.Mesh(geometry, material);
-                return mesh;
+                // HEAD - wide and tall
+                const headShape = new THREE.Shape();
+                headShape.moveTo(-headWidth/2, -headHeight/2);
+                headShape.lineTo(headWidth/3, -headHeight/2);
+                headShape.lineTo(headWidth/2, headHeight/2);
+                headShape.lineTo(-headWidth/2, headHeight/2);
+                headShape.lineTo(-headWidth/2, -headHeight/2);
+                
+                const headGeom = new THREE.ExtrudeGeometry(headShape, {
+                    extrudePath: curvePath,
+                    steps: segments,
+                    bevelEnabled: false
+                });
+                
+                // Offset head radially outward
+                const headMesh = new THREE.Mesh(headGeom, material);
+                headMesh.position.set(0, 0, 0);
+                
+                // Scale head to correct depth
+                const headScaleFactor = headDepth / frameRadius;
+                headMesh.scale.set(1 - headScaleFactor/2, 1 - headScaleFactor/2, 1);
+                
+                group.add(headMesh);
+                
+                // NECK - narrow and thin
+                const neckShape = new THREE.Shape();
+                neckShape.moveTo(-neckWidth/2, -neckHeight/2);
+                neckShape.lineTo(neckWidth/2, -neckHeight/2);
+                neckShape.lineTo(neckWidth/2, neckHeight/2);
+                neckShape.lineTo(-neckWidth/2, neckHeight/2);
+                neckShape.lineTo(-neckWidth/2, -neckHeight/2);
+                
+                const neckGeom = new THREE.ExtrudeGeometry(neckShape, {
+                    extrudePath: curvePath,
+                    steps: segments,
+                    bevelEnabled: false
+                });
+                
+                const neckMesh = new THREE.Mesh(neckGeom, material);
+                const neckScaleFactor = (headDepth + neckDepth) / frameRadius;
+                neckMesh.scale.set(1 - neckScaleFactor/2, 1 - neckScaleFactor/2, 1);
+                
+                group.add(neckMesh);
+                
+                // STEM - thin connection to rotor
+                const stemShape = new THREE.Shape();
+                stemShape.moveTo(-stemWidth/2, -stemHeight/2);
+                stemShape.lineTo(stemWidth/2, -stemHeight/2);
+                stemShape.lineTo(stemWidth/2, stemHeight/2);
+                stemShape.lineTo(-stemWidth/2, stemHeight/2);
+                stemShape.lineTo(-stemWidth/2, -stemHeight/2);
+                
+                const stemGeom = new THREE.ExtrudeGeometry(stemShape, {
+                    extrudePath: curvePath,
+                    steps: segments,
+                    bevelEnabled: false
+                });
+                
+                const stemMesh = new THREE.Mesh(stemGeom, material);
+                const stemScaleFactor = totalRailDepth / frameRadius;
+                stemMesh.scale.set(1 - stemScaleFactor/2, 1 - stemScaleFactor/2, 1);
+                
+                group.add(stemMesh);
+                
+                return group;
             }
 
             // ========================================================================
@@ -714,6 +609,7 @@
                 // Vertical system (Yin - White)
                 this.frameYin = new THREE.Mesh(frameGeometry, this.materials.glass);
                 this.frameYin.rotation.y = Math.PI / 2;
+                this.frameYin.renderOrder = 999; // Render transparent frames last
                 this.scene.add(this.frameYin);
 
                 this.rotorYin = new THREE.Group();
@@ -727,6 +623,7 @@
                 this.frameYang = new THREE.Mesh(frameGeometry, this.materials.glass);
                 this.frameYang.rotation.x = Math.PI / 2;
                 this.frameYang.rotation.z = Math.PI / 2;
+                this.frameYang.renderOrder = 999; // Render transparent frames last
                 this.scene.add(this.frameYang);
 
                 this.rotorYang = new THREE.Group();
@@ -793,8 +690,67 @@
 
             exportFrame() {
                 const frameGeometry = this.createFrameGeometry();
-                const frame = new THREE.Mesh(frameGeometry, this.materials.glass);
-                this.exportToSTL(frame, 'gimbal_frame.stl');
+                
+                // Create both rings with proper rotations
+                // Vertical ring (Yin frame)
+                const frameYinGeom = frameGeometry.clone();
+                frameYinGeom.rotateY(Math.PI / 2);
+                
+                // Horizontal ring (Yang frame)
+                const frameYangGeom = frameGeometry.clone();
+                frameYangGeom.rotateX(Math.PI / 2);
+                frameYangGeom.rotateZ(Math.PI / 2);
+                
+                // Merge both geometries into one
+                const mergedGeometry = new THREE.BufferGeometry();
+                const geometries = [frameYinGeom, frameYangGeom];
+                
+                // Manually merge the geometries
+                let totalVertices = 0;
+                let totalIndices = 0;
+                
+                for (const geom of geometries) {
+                    totalVertices += geom.attributes.position.count;
+                    if (geom.index) {
+                        totalIndices += geom.index.count;
+                    }
+                }
+                
+                const positions = new Float32Array(totalVertices * 3);
+                const normals = new Float32Array(totalVertices * 3);
+                const indices = new Uint32Array(totalIndices);
+                
+                let vertexOffset = 0;
+                let indexOffset = 0;
+                let vertexCount = 0;
+                
+                for (const geom of geometries) {
+                    const posAttr = geom.attributes.position;
+                    const normAttr = geom.attributes.normal;
+                    
+                    positions.set(posAttr.array, vertexOffset * 3);
+                    if (normAttr) {
+                        normals.set(normAttr.array, vertexOffset * 3);
+                    }
+                    
+                    if (geom.index) {
+                        const indexArray = geom.index.array;
+                        for (let i = 0; i < indexArray.length; i++) {
+                            indices[indexOffset + i] = indexArray[i] + vertexCount;
+                        }
+                        indexOffset += indexArray.length;
+                    }
+                    
+                    vertexCount += posAttr.count;
+                    vertexOffset += posAttr.count;
+                }
+                
+                mergedGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 4));
+                mergedGeometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+                mergedGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
+                
+                const frameMesh = new THREE.Mesh(mergedGeometry, this.materials.glass);
+                this.exportToSTL(frameMesh, 'gimbal_frame.stl');
             }
 
             exportYinRotor() {
