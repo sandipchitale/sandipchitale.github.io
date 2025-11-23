@@ -372,26 +372,6 @@ n    <title>Yin Yang T-slot Gimbal</title>
                         metalness: 0.0,
                         side: THREE.DoubleSide,
                         flatShading: false
-                    }),
-                    yinRail: new THREE.MeshStandardMaterial({
-                        color: 0xf0f0f0,
-                        roughness: 0.7,
-                        metalness: 0.2,
-                        side: THREE.DoubleSide,
-                        flatShading: false,
-                        polygonOffset: true,
-                        polygonOffsetFactor: 0.5,
-                        polygonOffsetUnits: 0.5
-                    }),
-                    yangRail: new THREE.MeshStandardMaterial({
-                        color: 0x1a1a1a,
-                        roughness: 0.7,
-                        metalness: 0.2,
-                        side: THREE.DoubleSide,
-                        flatShading: false,
-                        polygonOffset: true,
-                        polygonOffsetFactor: 0.5,
-                        polygonOffsetUnits: 0.5
                     })
                 };
             }
@@ -487,7 +467,7 @@ n    <title>Yin Yang T-slot Gimbal</title>
                 return geometry;
             }
 
-            createBearingArc(material) {
+            createBearingArc(material, isYin = true) {
                 const { frameRadius, shapeRadius, tSlotMouthWidth, tSlotChamberWidth, shapeThickness } = CONFIG;
 
                 // Simplified T-rail using separate components to avoid shimmering
@@ -497,21 +477,7 @@ n    <title>Yin Yang T-slot Gimbal</title>
                 // Arc parameters
                 const startAngle = -Math.PI / 2 + Math.PI / 18;
                 const endAngle = Math.PI / 2 - Math.PI / 18;
-                const segments = 128; // Reduced segments for cleaner geometry
-                
-                // Dimensions
-                const headWidth = tSlotChamberWidth - clearance;
-                const headHeight = 0.25;
-                const headDepth = 0.15;
-                
-                const neckWidth = tSlotMouthWidth - clearance;
-                const neckHeight = shapeThickness;
-                const neckDepth = 0.12;
-                
-                const stemWidth = shapeThickness;
-                const stemHeight = shapeThickness;
-                const totalRailDepth = (frameRadius - shapeRadius) + 0.05;
-                const stemDepth = totalRailDepth - neckDepth - headDepth;
+                const segments = 128;
                 
                 // Create curve path for the arc
                 const curve = new THREE.EllipseCurve(
@@ -527,72 +493,141 @@ n    <title>Yin Yang T-slot Gimbal</title>
                     points.map(p => new THREE.Vector3(p.x, p.y, 0))
                 );
                 
-                // Create three separate tubes for head, neck, and stem
-                // This avoids the complex geometry that causes shimmering
+                // Create T-shaped rail: simple T cross-section extruded along arc
+                // Stem thickness = shapeThickness (matches Yin/Yang)
+                // Head width = headWidth (fits in T-slot)
                 
-                // HEAD - wide and tall
-                const headShape = new THREE.Shape();
-                headShape.moveTo(-headWidth/2, -headHeight/2);
-                headShape.lineTo(headWidth/3, -headHeight/2);
-                headShape.lineTo(headWidth/2, headHeight/2);
-                headShape.lineTo(-headWidth/2, headHeight/2);
-                headShape.lineTo(-headWidth/2, -headHeight/2);
+                const railGeometry = new THREE.BufferGeometry();
+                const railVertices = [];
+                const railIndices = [];
                 
-                const headGeom = new THREE.ExtrudeGeometry(headShape, {
-                    extrudePath: curvePath,
-                    steps: segments,
-                    bevelEnabled: false
-                });
+                // T-shape dimensions
+                const headWidth = 0.35;
+                const headHeight = 0.15;  // How far head extends radially
+                const stemThickness = shapeThickness;  // Matches rotor thickness
+                const stemHeight = (frameRadius - shapeRadius) - headHeight;  // Stem extends from rotor to head
                 
-                // Offset head radially outward
-                const headMesh = new THREE.Mesh(headGeom, material);
-                headMesh.position.set(0, 0, 0);
+                const halfHeadWidth = headWidth / 2;
+                const halfStemThickness = stemThickness / 2;
                 
-                // Scale head to correct depth
-                const headScaleFactor = headDepth / frameRadius;
-                headMesh.scale.set(1 - headScaleFactor/2, 1 - headScaleFactor/2, 1);
+                // Create arc curve
+                const arcCurve = new THREE.EllipseCurve(
+                    0, 0,
+                    frameRadius, frameRadius,
+                    startAngle, endAngle,
+                    false,
+                    0
+                );
+                const arcPoints = arcCurve.getPoints(segments);
                 
-                group.add(headMesh);
+                // Build T-shaped cross-section at each point along the arc
+                for (let i = 0; i < arcPoints.length; i++) {
+                    const pt = arcPoints[i];
+                    const angle = Math.atan2(pt.y, pt.x);
+                    const cos = Math.cos(angle);
+                    const sin = Math.sin(angle);
+                    
+                    // Define radii for T-shape
+                    const headOuterRadius = frameRadius;
+                    const headInnerRadius = frameRadius - headHeight;
+                    const stemInnerRadius = shapeRadius - 0.05; // Extend inward to overlap with rotor body
+                    
+                    // Calculate positions
+                    const headOuterX = headOuterRadius * cos;
+                    const headOuterY = headOuterRadius * sin;
+                    const headInnerX = headInnerRadius * cos;
+                    const headInnerY = headInnerRadius * sin;
+                    const stemInnerX = stemInnerRadius * cos;
+                    const stemInnerY = stemInnerRadius * sin;
+                    
+                    // Create T-shaped cross-section (8 vertices)
+                    // HEAD (wide part)
+                    railVertices.push(headOuterX, headOuterY, halfHeadWidth);       // 0 - head top right
+                    railVertices.push(headOuterX, headOuterY, -halfHeadWidth);      // 1 - head top left
+                    railVertices.push(headInnerX, headInnerY, halfHeadWidth);       // 2 - head bottom right
+                    railVertices.push(headInnerX, headInnerY, -halfHeadWidth);      // 3 - head bottom left
+                    
+                    // STEM (narrow part)
+                    railVertices.push(headInnerX, headInnerY, halfStemThickness);   // 4 - stem top right
+                    railVertices.push(headInnerX, headInnerY, -halfStemThickness);  // 5 - stem top left
+                    railVertices.push(stemInnerX, stemInnerY, halfStemThickness);   // 6 - stem bottom right
+                    railVertices.push(stemInnerX, stemInnerY, -halfStemThickness);  // 7 - stem bottom left
+                }
                 
-                // NECK - narrow and thin
-                const neckShape = new THREE.Shape();
-                neckShape.moveTo(-neckWidth/2, -neckHeight/2);
-                neckShape.lineTo(neckWidth/2, -neckHeight/2);
-                neckShape.lineTo(neckWidth/2, neckHeight/2);
-                neckShape.lineTo(-neckWidth/2, neckHeight/2);
-                neckShape.lineTo(-neckWidth/2, -neckHeight/2);
+                // Create faces along the extrusion
+                for (let i = 0; i < arcPoints.length - 1; i++) {
+                    const curr = i * 8;
+                    const next = (i + 1) * 8;
+                    
+                    // HEAD faces
+                    // Top face (outer) - always render
+                    railIndices.push(curr, curr + 1, next);
+                    railIndices.push(next, curr + 1, next + 1);
+                    // Bottom face (inner) - SKIP to avoid z-fighting with stem
+                    // railIndices.push(curr + 2, next + 2, curr + 3);
+                    // railIndices.push(curr + 3, next + 2, next + 3);
+                    // Right side
+                    railIndices.push(curr, next, curr + 2);
+                    railIndices.push(curr + 2, next, next + 2);
+                    // Left side
+                    railIndices.push(curr + 1, curr + 3, next + 1);
+                    railIndices.push(next + 1, curr + 3, next + 3);
+                    
+                    // STEM faces
+                    // Right side
+                    railIndices.push(curr + 4, next + 4, curr + 6);
+                    railIndices.push(curr + 6, next + 4, next + 6);
+                    // Left side
+                    railIndices.push(curr + 5, curr + 7, next + 5);
+                    railIndices.push(next + 5, curr + 7, next + 7);
+                    // Bottom face (connects to rotor) - SKIP to avoid z-fighting
+                    // railIndices.push(curr + 6, next + 6, curr + 7);
+                    // railIndices.push(curr + 7, next + 6, next + 7);
+                    
+                    // TRANSITION faces (connect head to stem)
+                    // Right transition
+                    railIndices.push(curr + 2, next + 2, curr + 4);
+                    railIndices.push(curr + 4, next + 2, next + 4);
+                    // Left transition
+                    railIndices.push(curr + 3, curr + 5, next + 3);
+                    railIndices.push(next + 3, curr + 5, next + 5);
+                }
                 
-                const neckGeom = new THREE.ExtrudeGeometry(neckShape, {
-                    extrudePath: curvePath,
-                    steps: segments,
-                    bevelEnabled: false
-                });
+                // Add end caps
+                // We need to duplicate vertices to ensure sharp edges (flat shading for caps)
+                const startVerts = railVertices.slice(0, 8 * 3);
+                const endVerts = railVertices.slice(railVertices.length - 8 * 3);
                 
-                const neckMesh = new THREE.Mesh(neckGeom, material);
-                const neckScaleFactor = (headDepth + neckDepth) / frameRadius;
-                neckMesh.scale.set(1 - neckScaleFactor/2, 1 - neckScaleFactor/2, 1);
+                const startCapIdx = railVertices.length / 3;
+                for (let i = 0; i < startVerts.length; i++) railVertices.push(startVerts[i]);
                 
-                group.add(neckMesh);
+                const endCapIdx = railVertices.length / 3;
+                for (let i = 0; i < endVerts.length; i++) railVertices.push(endVerts[i]);
                 
-                // STEM - thin connection to rotor
-                const stemShape = new THREE.Shape();
-                stemShape.moveTo(-stemWidth/2, -stemHeight/2);
-                stemShape.lineTo(stemWidth/2, -stemHeight/2);
-                stemShape.lineTo(stemWidth/2, stemHeight/2);
-                stemShape.lineTo(-stemWidth/2, stemHeight/2);
-                stemShape.lineTo(-stemWidth/2, -stemHeight/2);
+                // Start Cap Faces (Normal pointing away from arc start)
+                const s = startCapIdx;
+                // Head
+                railIndices.push(s+0, s+1, s+2);
+                railIndices.push(s+2, s+1, s+3);
+                // Stem
+                railIndices.push(s+4, s+5, s+6);
+                railIndices.push(s+6, s+5, s+7);
                 
-                const stemGeom = new THREE.ExtrudeGeometry(stemShape, {
-                    extrudePath: curvePath,
-                    steps: segments,
-                    bevelEnabled: false
-                });
+                // End Cap Faces (Normal pointing forwards)
+                const e = endCapIdx;
+                // Head
+                railIndices.push(e+0, e+2, e+1);
+                railIndices.push(e+1, e+2, e+3);
+                // Stem
+                railIndices.push(e+4, e+6, e+5);
+                railIndices.push(e+5, e+6, e+7);
                 
-                const stemMesh = new THREE.Mesh(stemGeom, material);
-                const stemScaleFactor = totalRailDepth / frameRadius;
-                stemMesh.scale.set(1 - stemScaleFactor/2, 1 - stemScaleFactor/2, 1);
+                railGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(railVertices), 3));
+                railGeometry.setIndex(railIndices);
+                railGeometry.computeVertexNormals();
                 
-                group.add(stemMesh);
+                const railMesh = new THREE.Mesh(railGeometry, material);
+                group.add(railMesh);
                 
                 return group;
             }
@@ -615,7 +650,7 @@ n    <title>Yin Yang T-slot Gimbal</title>
                 this.rotorYin = new THREE.Group();
                 const shapeYin = new THREE.Mesh(teardropGeometry, this.materials.yinWhite);
                 this.rotorYin.add(shapeYin);
-                this.rotorYin.add(this.createBearingArc(this.materials.yinRail));
+                this.rotorYin.add(this.createBearingArc(this.materials.yinWhite, true));
                 this.rotorYin.rotation.y = Math.PI / 2;
                 this.scene.add(this.rotorYin);
 
@@ -629,7 +664,7 @@ n    <title>Yin Yang T-slot Gimbal</title>
                 this.rotorYang = new THREE.Group();
                 this.shapeYang = new THREE.Mesh(teardropGeometry, this.materials.yangBlack);
                 this.rotorYang.add(this.shapeYang);
-                this.rotorYang.add(this.createBearingArc(this.materials.yangRail));
+                this.rotorYang.add(this.createBearingArc(this.materials.yangBlack, false));
                 this.rotorYang.rotation.x = Math.PI / 2;
                 this.rotorYang.rotation.z = Math.PI / 2;
                 this.scene.add(this.rotorYang);
@@ -757,7 +792,7 @@ n    <title>Yin Yang T-slot Gimbal</title>
                 const group = new THREE.Group();
                 const shape = new THREE.Mesh(this.createTeardropShape(), this.materials.yinWhite);
                 group.add(shape);
-                group.add(this.createBearingArc(this.materials.yinRail));
+                group.add(this.createBearingArc(this.materials.yinWhite, true));
                 this.exportToSTL(group, 'gimbal_yin_rotor.stl');
             }
 
@@ -765,7 +800,7 @@ n    <title>Yin Yang T-slot Gimbal</title>
                 const group = new THREE.Group();
                 const shape = new THREE.Mesh(this.createTeardropShape(), this.materials.yangBlack);
                 group.add(shape);
-                group.add(this.createBearingArc(this.materials.yangRail));
+                group.add(this.createBearingArc(this.materials.yangBlack, false));
                 this.exportToSTL(group, 'gimbal_yang_rotor.stl');
             }
 
@@ -834,6 +869,14 @@ n    <title>Yin Yang T-slot Gimbal</title>
                     this.camera.aspect = window.innerWidth / window.innerHeight;
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+                
+                // Click on canvas to toggle animation
+                this.renderer.domElement.addEventListener('click', () => {
+                    this.animationState.isPlaying = !this.animationState.isPlaying;
+                    const toggleButton = document.getElementById('toggleAnimation');
+                    toggleButton.textContent = this.animationState.isPlaying ? 
+                        'Pause Animation' : 'Resume Animation';
                 });
             }
         }
