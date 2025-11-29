@@ -1,891 +1,286 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-n    <title>Yin Yang T-slot Gimbal</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yin Yang Gimbal Visualization</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            overflow: hidden;
-            background-color: #222;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-        }
-
-        #info {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            color: #ccc;
-            pointer-events: none;
-            z-index: 10;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-        }
-
-        #info h1 {
-            font-size: 2em;
-            font-weight: 300;
-            margin-bottom: 8px;
-            color: #fff;
-        }
-
-        #info p {
-            font-size: 0.9em;
-            color: #aaa;
-        }
-
-        #controls {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 280px;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            padding: 20px;
-            border-radius: 12px;
-            color: #fff;
-            z-index: 10;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-            transition: transform 0.3s ease, opacity 0.3s ease;
-        }
-
-        #controls.collapsed {
-            transform: translateX(calc(100% + 20px));
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        #controls-toggle {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 50px;
-            height: 50px;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            color: #fff;
-            font-size: 24px;
-            cursor: pointer;
-            z-index: 11;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-        }
-
-        #controls-toggle:hover {
-            background: rgba(0, 0, 0, 0.85);
-            border-color: rgba(255, 255, 255, 0.4);
-            transform: scale(1.1);
-        }
-
-        .control-section {
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .control-section:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-            border-bottom: none;
-        }
-
-        .control-section h3 {
-            font-size: 0.85em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #888;
-            margin-bottom: 12px;
-            font-weight: 600;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 0.9em;
-            color: #ccc;
-        }
-
-        .value-display {
-            color: #00ddff;
-            font-weight: 600;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: rgba(255, 255, 255, 0.2);
-            outline: none;
-            cursor: pointer;
-            -webkit-appearance: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #00ddff;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-
-        input[type="range"]::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #00ddff;
-            cursor: pointer;
-            border: none;
-            transition: transform 0.2s;
-        }
-
-        input[type="range"]::-moz-range-thumb:hover {
-            transform: scale(1.2);
-        }
-
-        button {
-            width: 100%;
-            padding: 12px;
-            margin-top: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            font-size: 0.9em;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 500;
-        }
-
-        button:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: rgba(255, 255, 255, 0.4);
-            transform: translateY(-1px);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        button.primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-color: transparent;
-        }
-
-        button.primary:hover {
-            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-        }
-
-        button.success {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            border-color: transparent;
-        }
-
-        button.success:hover {
-            background: linear-gradient(135deg, #38ef7d 0%, #11998e 100%);
-        }
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #1a1a1a;
+        font-family: "Inter", sans-serif;
+        color: #ffffff;
+      }
+      #info {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 20px;
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        pointer-events: auto;
+      }
+      h1 {
+        margin: 0 0 15px 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+      }
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .control-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+      }
+      input[type="checkbox"] {
+        accent-color: #4caf50;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+      label {
+        font-size: 0.9rem;
+        cursor: pointer;
+        user-select: none;
+      }
+      #status {
+        margin-top: 15px;
+        font-size: 0.8rem;
+        color: #888;
+        font-style: italic;
+      }
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #4caf50;
+        pointer-events: none;
+      }
     </style>
+    <!-- Import maps polyfill -->
+    <script
+      async
+      src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"
+    ></script>
+
     <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
         }
+      }
     </script>
-</head>
-<body>
-    <button id="controls-toggle" title="Toggle Controls">☰</button>
-    
-    <div id="controls" class="collapsed">
-        <div class="control-section">
-            <h3>Animation</h3>
-            <button id="toggleAnimation" class="primary">Pause Animation</button>
+  </head>
+  <body>
+    <div id="loading">Loading Models...</div>
+    <div id="info">
+      <h1>Yin Yang Gimbal</h1>
+      <div class="control-group">
+        <div class="control-item">
+          <input type="checkbox" id="toggle-yin" checked />
+          <label for="toggle-yin">Show Yin Rotor</label>
         </div>
-
-        <div class="control-section">
-            <h3>Visibility</h3>
-            <button id="toggleYin" class="success">Hide Yin Assembly</button>
-            <button id="toggleYang" class="success">Hide Yang Assembly</button>
-            <button id="toggleFrame" class="success">Hide Frame</button>
+        <div class="control-item">
+          <input type="checkbox" id="toggle-yang" checked />
+          <label for="toggle-yang">Show Yang Rotor</label>
         </div>
-
-        <div class="control-section">
-            <h3>3D Print Export</h3>
-            <button id="exportFrame">Export Frame (STL)</button>
-            <button id="exportYin">Export Yin Rotor (STL)</button>
-            <button id="exportYang">Export Yang Rotor (STL)</button>
+        <div class="control-item">
+          <input type="checkbox" id="toggle-frame-left" checked />
+          <label for="toggle-frame-left">Show Left Frame</label>
         </div>
+        <div class="control-item">
+          <input type="checkbox" id="toggle-frame-right" checked />
+          <label for="toggle-frame-right">Show Right Frame</label>
+        </div>
+        <div class="control-item">
+          <input type="checkbox" id="toggle-anim" checked />
+          <label for="toggle-anim">Animate (Click Model to Toggle)</label>
+        </div>
+      </div>
+      <div id="status">Click anywhere on the model to pause/resume.</div>
     </div>
 
-    <div id="canvas-container"></div>
-
     <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { STLLoader } from "three/addons/loaders/STLLoader.js";
 
-        // ============================================================================
-        // CONFIGURATION
-        // ============================================================================
-        
-        const CONFIG = {
-            // Dimensions
-            frameRadius: 4.0,
-            shapeRadius: 3.65,
-            shapeThickness: 0.15,
-            centerHoleRadius: 0.35,
-            
-            // Frame profile - T-slot dimensions
-            frameThickness: 0.4,       // Reduced from 0.8 - much thinner walls
-            frameWidth: 0.5,           // Reduced from 0.8 - thinner profile
-            tSlotMouthWidth: 0.3,      // Mouth opening (narrow part)
-            tSlotChamberWidth: 0.5,    // Chamber width (wide part)
-            tSlotChamberDepth: 0.3,    // How deep the chamber goes
-            tSlotLipDepth: 0.08,       // Lip thickness before chamber
-            
-            // Bearing dimensions
-            bearingHeadRadius: 0.10,
-            bearingHeadHeight: 0.10,
-            bearingNeckRadius: 0.06,
-            bearingCount: 9,
-            
-            // Animation
-            rotationSpeed: 0.015,
-            
-            // Geometry
-            latheSegments: 128,
-            cylinderSegments: 16,
-            filletRadius: 0.15
-        };
+      // Scene Setup
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1a1a);
+      // Add some fog for depth
+      scene.fog = new THREE.Fog(0x1a1a1a, 20, 100);
 
-        // ============================================================================
-        // SCENE SETUP
-        // ============================================================================
-        
-        class GimbalScene {
-            constructor() {
-                this.initScene();
-                this.initLights();
-                this.initMaterials();
-                this.buildGimbal();
-                this.initControls();
-                this.initAnimation();
-                this.initExporter();
-                this.setupEventListeners();
-                this.animate();
-            }
+      const camera = new THREE.PerspectiveCamera(
+        45,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(30, 20, 30);
 
-            initScene() {
-                // Scene
-                this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x222222);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
 
-                // Camera - optimized near/far for better depth precision
-                this.camera = new THREE.PerspectiveCamera(
-                    45,
-                    window.innerWidth / window.innerHeight,
-                    1,
-                    100
-                );
-                this.camera.position.set(12, 10, 12);
+      // Controls
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
 
-                // Renderer - enable logarithmic depth buffer to fix z-fighting
-                this.renderer = new THREE.WebGLRenderer({ 
-                    antialias: true,
-                    logarithmicDepthBuffer: true,
-                    powerPreference: 'high-performance'
-                });
-                // Enable shadow map for better depth perception (helps reduce shimmer)
-                this.renderer.shadowMap.enabled = false; // Keep disabled for performance
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2 to avoid over-sampling artifacts
-                document.getElementById('canvas-container').appendChild(this.renderer.domElement);
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0x404040, 2); // Soft white light
+      scene.add(ambientLight);
 
-                // Orbit controls
-                this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
-                this.orbitControls.enableDamping = true;
-                this.orbitControls.dampingFactor = 0.05;
-            }
+      const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+      dirLight.position.set(10, 20, 10);
+      scene.add(dirLight);
 
-            initLights() {
-                // Ambient light - neutral white
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-                this.scene.add(ambientLight);
+      const backLight = new THREE.DirectionalLight(0x445566, 1);
+      backLight.position.set(-10, 5, -10);
+      scene.add(backLight);
 
-                // Main directional light - neutral white
-                const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                mainLight.position.set(5, 10, 5);
-                this.scene.add(mainLight);
+      // Materials
+      const materialYin = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.4,
+        metalness: 0.1,
+      });
+      const materialYang = new THREE.MeshStandardMaterial({
+        color: 0x222222,
+        roughness: 0.4,
+        metalness: 0.1,
+      });
+      const materialFrame = new THREE.MeshStandardMaterial({
+        color: 0x888888,
+        roughness: 0.7,
+        metalness: 0.5,
+      });
 
-                // Fill light from opposite side - neutral white
-                const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
-                fillLight.position.set(-5, -3, -5);
-                this.scene.add(fillLight);
-            }
+      // Groups for rotation
+      const yinGroup = new THREE.Group();
+      const yangGroup = new THREE.Group();
+      const frameGroup = new THREE.Group();
+      // Initial rotation handled by animation loop now
+      scene.add(yinGroup);
+      scene.add(yangGroup);
+      scene.add(frameGroup);
 
-            initMaterials() {
-                this.materials = {
-                    glass: new THREE.MeshStandardMaterial({
-                        color: 0xccddff,
-                        metalness: 0.1,
-                        roughness: 0.1,
-                        transparent: true,
-                        opacity: 0.15,
-                        side: THREE.DoubleSide,
-                        depthWrite: false,
-                        premultipliedAlpha: true
-                    }),
-                    yinWhite: new THREE.MeshStandardMaterial({
-                        color: 0xf0f0f0,
-                        roughness: 0.9,
-                        metalness: 0.0,
-                        side: THREE.DoubleSide,
-                        flatShading: false
-                    }),
-                    yangBlack: new THREE.MeshStandardMaterial({
-                        color: 0x1a1a1a,
-                        roughness: 0.9,
-                        metalness: 0.0,
-                        side: THREE.DoubleSide,
-                        flatShading: false
-                    })
-                };
-            }
+      // Loaders
+      const loader = new STLLoader();
+      let loadedCount = 0;
+      const totalModels = 4;
 
-            // ========================================================================
-            // GEOMETRY CREATION
-            // ========================================================================
+      function checkLoaded() {
+        loadedCount++;
+        if (loadedCount === totalModels) {
+          document.getElementById("loading").style.display = "none";
+          animate();
+        }
+      }
 
-            createFrameGeometry() {
-                const { frameRadius, frameThickness, frameWidth, 
-                        tSlotMouthWidth, tSlotChamberWidth, 
-                        tSlotChamberDepth, tSlotLipDepth, latheSegments } = CONFIG;
+      function loadSTL(path, material, group, name) {
+        loader.load(
+          path,
+          function (geometry) {
+            geometry.computeVertexNormals();
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.name = name;
+            group.add(mesh);
+            checkLoaded();
+          },
+          undefined,
+          function (error) {
+            console.error("Error loading " + path, error);
+          }
+        );
+      }
 
-                const halfThick = frameThickness / 2;
-                const halfWidth = frameWidth / 2;
-                const cx = frameRadius;
+      // Load Models
+      // Assuming files are in the same directory
+      loadSTL("./yin.stl", materialYin, yinGroup, "yin");
+      loadSTL("./yang.stl", materialYang, yangGroup, "yang");
+      loadSTL("./frame_left.stl", materialFrame, frameGroup, "frame_left");
+      loadSTL("./frame_right.stl", materialFrame, frameGroup, "frame_right");
 
-                const hMouth = tSlotMouthWidth / 2;
-                const hChamber = tSlotChamberWidth / 2;
+      // Animation State
+      let isAnimating = true;
+      const rotationSpeed = 0.01;
 
-                const xInner = cx - halfWidth;
-                const xOuter = cx + halfWidth;
-                const xChamberStart = xInner + tSlotLipDepth;
-                const xChamberBack = xInner + tSlotChamberDepth;
+      // UI Logic
+      const toggleVisibility = (id, objectName) => {
+        document.getElementById(id).addEventListener("change", (e) => {
+          if (objectName === "yin" || objectName === "yang") {
+            if (objectName === "yin") yinGroup.visible = e.target.checked;
+            if (objectName === "yang") yangGroup.visible = e.target.checked;
+          } else {
+            const mesh = frameGroup.children.find((c) => c.name === objectName);
+            if (mesh) mesh.visible = e.target.checked;
+          }
+        });
+      };
 
-                // Build T-slot profile
-                const points = [
-                    new THREE.Vector2(xInner, hMouth),
-                    new THREE.Vector2(xChamberStart, hMouth),
-                    new THREE.Vector2(xChamberStart, hChamber),
-                    new THREE.Vector2(xChamberBack, hChamber),
-                    new THREE.Vector2(xChamberBack, -hChamber),
-                    new THREE.Vector2(xChamberStart, -hChamber),
-                    new THREE.Vector2(xChamberStart, -hMouth),
-                    new THREE.Vector2(xInner, -hMouth),
-                    new THREE.Vector2(xInner, -halfThick),
-                    new THREE.Vector2(xOuter, -halfThick),
-                    new THREE.Vector2(xOuter, halfThick),
-                    new THREE.Vector2(xInner, halfThick),
-                    new THREE.Vector2(xInner, hMouth)
-                ];
+      toggleVisibility("toggle-yin", "yin");
+      toggleVisibility("toggle-yang", "yang");
+      toggleVisibility("toggle-frame-left", "frame_left");
+      toggleVisibility("toggle-frame-right", "frame_right");
 
-                const geometry = new THREE.LatheGeometry(points, latheSegments);
-                geometry.rotateX(Math.PI / 2);
+      const animToggle = document.getElementById("toggle-anim");
+      animToggle.addEventListener("change", (e) => {
+        isAnimating = e.target.checked;
+        document.getElementById("status").textContent = isAnimating
+          ? "Animation running..."
+          : "Animation paused.";
+      });
 
-                return geometry;
-            }
+      // Click to toggle
+      window.addEventListener("mousedown", (event) => {
+        // Only toggle if not clicking on UI
+        if (event.target.closest("#info")) return;
 
-            createTeardropShape() {
-                const { shapeRadius, centerHoleRadius, shapeThickness, filletRadius } = CONFIG;
-                
-                const R = shapeRadius;
-                const r_hole = centerHoleRadius;
-                const Rs = R / 2;
-                const rf = filletRadius;
+        isAnimating = !isAnimating;
+        animToggle.checked = isAnimating;
+        document.getElementById("status").textContent = isAnimating
+          ? "Animation running..."
+          : "Animation paused.";
+      });
 
-                const shape = new THREE.Shape();
+      // Resize Handler
+      window.addEventListener("resize", onWindowResize, false);
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
 
-                // Helper function for fillet calculations
-                const getFilletData = (y1, d1, d2, intersectionSign) => {
-                    const fy = (y1 * y1 - d1 * d1 + d2 * d2) / (2 * y1);
-                    const fx = intersectionSign * Math.sqrt(d2 * d2 - fy * fy);
-                    const angleFromC1 = Math.atan2(fy - y1, fx);
-                    const angleFromC2 = Math.atan2(fy, fx);
-                    return { fx, fy, angleFromC1, angleFromC2 };
-                };
+      // Animation Loop
+      function animate() {
+        requestAnimationFrame(animate);
 
-                // Calculate fillets
-                const topFillet = getFilletData(Rs, Rs - rf, r_hole + rf, -1);
-                const botFillet = getFilletData(-Rs, Rs + rf, r_hole + rf, 1);
+        if (isAnimating) {
+          // Rotate Yin around Z axis
+          yinGroup.rotation.z += rotationSpeed;
 
-                // Build the teardrop path
-                shape.absarc(0, 0, R, -Math.PI / 2, Math.PI / 2, false);
-                shape.absarc(0, Rs, Rs, Math.PI / 2, topFillet.angleFromC1, false);
-                shape.absarc(topFillet.fx, topFillet.fy, rf, topFillet.angleFromC1, topFillet.angleFromC2 + Math.PI, false);
-                shape.absarc(0, 0, r_hole, topFillet.angleFromC2, botFillet.angleFromC2, true);
-                shape.absarc(botFillet.fx, botFillet.fy, rf, botFillet.angleFromC2 + Math.PI, botFillet.angleFromC1 + Math.PI, false);
-                shape.absarc(0, -Rs, Rs, botFillet.angleFromC1, -Math.PI / 2, true);
-
-                // Add the "dot" hole
-                const dotRadius = Rs / 3.5;
-                const dotPath = new THREE.Path();
-                dotPath.absarc(0, Rs, dotRadius, 0, Math.PI * 2, true);
-                shape.holes.push(dotPath);
-
-                // Extrude the shape
-                const geometry = new THREE.ExtrudeGeometry(shape, {
-                    depth: shapeThickness,
-                    bevelEnabled: false
-                });
-                geometry.translate(0, 0, -shapeThickness / 2);
-
-                return geometry;
-            }
-
-            createBearingArc(material, isYin = true) {
-                const { frameRadius, shapeRadius, tSlotMouthWidth, tSlotChamberWidth, shapeThickness } = CONFIG;
-
-                // Simplified T-rail using separate components to avoid shimmering
-                const clearance = 0.02;
-                const group = new THREE.Group();
-                
-                // Arc parameters
-                const startAngle = -Math.PI / 2 + Math.PI / 18;
-                const endAngle = Math.PI / 2 - Math.PI / 18;
-                const segments = 128;
-                
-                // Create curve path for the arc
-                const curve = new THREE.EllipseCurve(
-                    0, 0,            // center
-                    frameRadius, frameRadius,  // x radius, y radius
-                    startAngle, endAngle,      // start angle, end angle
-                    false,           // clockwise
-                    0                // rotation
-                );
-                
-                const points = curve.getPoints(segments);
-                const curvePath = new THREE.CatmullRomCurve3(
-                    points.map(p => new THREE.Vector3(p.x, p.y, 0))
-                );
-                
-                // Create T-shaped rail: simple T cross-section extruded along arc
-                // Stem thickness = shapeThickness (matches Yin/Yang)
-                // Head width = headWidth (fits in T-slot)
-                
-                const railGeometry = new THREE.BufferGeometry();
-                const railVertices = [];
-                const railIndices = [];
-                
-                // T-shape dimensions
-                const headWidth = 0.35;
-                const headHeight = 0.15;  // How far head extends radially
-                const stemThickness = shapeThickness;  // Matches rotor thickness
-                const stemHeight = (frameRadius - shapeRadius) - headHeight;  // Stem extends from rotor to head
-                
-                const halfHeadWidth = headWidth / 2;
-                const halfStemThickness = stemThickness / 2;
-                
-                // Create arc curve
-                const arcCurve = new THREE.EllipseCurve(
-                    0, 0,
-                    frameRadius, frameRadius,
-                    startAngle, endAngle,
-                    false,
-                    0
-                );
-                const arcPoints = arcCurve.getPoints(segments);
-                
-                // Build T-shaped cross-section at each point along the arc
-                for (let i = 0; i < arcPoints.length; i++) {
-                    const pt = arcPoints[i];
-                    const angle = Math.atan2(pt.y, pt.x);
-                    const cos = Math.cos(angle);
-                    const sin = Math.sin(angle);
-                    
-                    // Define radii for T-shape
-                    const headOuterRadius = frameRadius;
-                    const headInnerRadius = frameRadius - headHeight;
-                    const stemInnerRadius = shapeRadius - 0.05; // Extend inward to overlap with rotor body
-                    
-                    // Calculate positions
-                    const headOuterX = headOuterRadius * cos;
-                    const headOuterY = headOuterRadius * sin;
-                    const headInnerX = headInnerRadius * cos;
-                    const headInnerY = headInnerRadius * sin;
-                    const stemInnerX = stemInnerRadius * cos;
-                    const stemInnerY = stemInnerRadius * sin;
-                    
-                    // Create T-shaped cross-section (8 vertices)
-                    // HEAD (wide part)
-                    railVertices.push(headOuterX, headOuterY, halfHeadWidth);       // 0 - head top right
-                    railVertices.push(headOuterX, headOuterY, -halfHeadWidth);      // 1 - head top left
-                    railVertices.push(headInnerX, headInnerY, halfHeadWidth);       // 2 - head bottom right
-                    railVertices.push(headInnerX, headInnerY, -halfHeadWidth);      // 3 - head bottom left
-                    
-                    // STEM (narrow part)
-                    railVertices.push(headInnerX, headInnerY, halfStemThickness);   // 4 - stem top right
-                    railVertices.push(headInnerX, headInnerY, -halfStemThickness);  // 5 - stem top left
-                    railVertices.push(stemInnerX, stemInnerY, halfStemThickness);   // 6 - stem bottom right
-                    railVertices.push(stemInnerX, stemInnerY, -halfStemThickness);  // 7 - stem bottom left
-                }
-                
-                // Create faces along the extrusion
-                for (let i = 0; i < arcPoints.length - 1; i++) {
-                    const curr = i * 8;
-                    const next = (i + 1) * 8;
-                    
-                    // HEAD faces
-                    // Top face (outer) - always render
-                    railIndices.push(curr, curr + 1, next);
-                    railIndices.push(next, curr + 1, next + 1);
-                    // Bottom face (inner) - SKIP to avoid z-fighting with stem
-                    // railIndices.push(curr + 2, next + 2, curr + 3);
-                    // railIndices.push(curr + 3, next + 2, next + 3);
-                    // Right side
-                    railIndices.push(curr, next, curr + 2);
-                    railIndices.push(curr + 2, next, next + 2);
-                    // Left side
-                    railIndices.push(curr + 1, curr + 3, next + 1);
-                    railIndices.push(next + 1, curr + 3, next + 3);
-                    
-                    // STEM faces
-                    // Right side
-                    railIndices.push(curr + 4, next + 4, curr + 6);
-                    railIndices.push(curr + 6, next + 4, next + 6);
-                    // Left side
-                    railIndices.push(curr + 5, curr + 7, next + 5);
-                    railIndices.push(next + 5, curr + 7, next + 7);
-                    // Bottom face (connects to rotor) - SKIP to avoid z-fighting
-                    // railIndices.push(curr + 6, next + 6, curr + 7);
-                    // railIndices.push(curr + 7, next + 6, next + 7);
-                    
-                    // TRANSITION faces (connect head to stem)
-                    // Right transition
-                    railIndices.push(curr + 2, next + 2, curr + 4);
-                    railIndices.push(curr + 4, next + 2, next + 4);
-                    // Left transition
-                    railIndices.push(curr + 3, curr + 5, next + 3);
-                    railIndices.push(next + 3, curr + 5, next + 5);
-                }
-                
-                // Add end caps
-                // We need to duplicate vertices to ensure sharp edges (flat shading for caps)
-                const startVerts = railVertices.slice(0, 8 * 3);
-                const endVerts = railVertices.slice(railVertices.length - 8 * 3);
-                
-                const startCapIdx = railVertices.length / 3;
-                for (let i = 0; i < startVerts.length; i++) railVertices.push(startVerts[i]);
-                
-                const endCapIdx = railVertices.length / 3;
-                for (let i = 0; i < endVerts.length; i++) railVertices.push(endVerts[i]);
-                
-                // Start Cap Faces (Normal pointing away from arc start)
-                const s = startCapIdx;
-                // Head
-                railIndices.push(s+0, s+1, s+2);
-                railIndices.push(s+2, s+1, s+3);
-                // Stem
-                railIndices.push(s+4, s+5, s+6);
-                railIndices.push(s+6, s+5, s+7);
-                
-                // End Cap Faces (Normal pointing forwards)
-                const e = endCapIdx;
-                // Head
-                railIndices.push(e+0, e+2, e+1);
-                railIndices.push(e+1, e+2, e+3);
-                // Stem
-                railIndices.push(e+4, e+6, e+5);
-                railIndices.push(e+5, e+6, e+7);
-                
-                railGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(railVertices), 3));
-                railGeometry.setIndex(railIndices);
-                railGeometry.computeVertexNormals();
-                
-                const railMesh = new THREE.Mesh(railGeometry, material);
-                group.add(railMesh);
-                
-                return group;
-            }
-
-            // ========================================================================
-            // BUILD GIMBAL
-            // ========================================================================
-
-            buildGimbal() {
-                // Create geometries
-                const frameGeometry = this.createFrameGeometry();
-                const teardropGeometry = this.createTeardropShape();
-
-                // Vertical system (Yin - White)
-                this.frameYin = new THREE.Mesh(frameGeometry, this.materials.glass);
-                this.frameYin.rotation.y = Math.PI / 2;
-                this.frameYin.renderOrder = 999; // Render transparent frames last
-                this.scene.add(this.frameYin);
-
-                this.rotorYin = new THREE.Group();
-                const shapeYin = new THREE.Mesh(teardropGeometry, this.materials.yinWhite);
-                this.rotorYin.add(shapeYin);
-                this.rotorYin.add(this.createBearingArc(this.materials.yinWhite, true));
-                this.rotorYin.rotation.y = Math.PI / 2;
-                this.scene.add(this.rotorYin);
-
-                // Horizontal system (Yang - Black)
-                this.frameYang = new THREE.Mesh(frameGeometry, this.materials.glass);
-                this.frameYang.rotation.x = Math.PI / 2;
-                this.frameYang.rotation.z = Math.PI / 2;
-                this.frameYang.renderOrder = 999; // Render transparent frames last
-                this.scene.add(this.frameYang);
-
-                this.rotorYang = new THREE.Group();
-                this.shapeYang = new THREE.Mesh(teardropGeometry, this.materials.yangBlack);
-                this.rotorYang.add(this.shapeYang);
-                this.rotorYang.add(this.createBearingArc(this.materials.yangBlack, false));
-                this.rotorYang.rotation.x = Math.PI / 2;
-                this.rotorYang.rotation.z = Math.PI / 2;
-                this.scene.add(this.rotorYang);
-            }
-
-            // ========================================================================
-            // CONTROLS & ANIMATION
-            // ========================================================================
-
-            initControls() {
-                this.animationState = {
-                    isPlaying: true,
-                    time: 0
-                };
-                
-                this.visibility = {
-                    yinAssembly: true,
-                    yangAssembly: true,
-                    frame: true
-                };
-            }
-
-            initAnimation() {
-                this.animate = this.animate.bind(this);
-            }
-
-            animate() {
-                requestAnimationFrame(this.animate);
-                
-                this.orbitControls.update();
-
-                if (this.animationState.isPlaying) {
-                    this.animationState.time += CONFIG.rotationSpeed;
-                    this.rotorYin.rotation.z = this.animationState.time;
-                    this.rotorYang.rotation.z = this.animationState.time + Math.PI / 2;
-                }
-
-                this.renderer.render(this.scene, this.camera);
-            }
-
-            // ========================================================================
-            // EXPORT FUNCTIONALITY
-            // ========================================================================
-
-            initExporter() {
-                this.exporter = new STLExporter();
-            }
-
-            exportToSTL(object, filename) {
-                const result = this.exporter.parse(object, { binary: true });
-                const blob = new Blob([result], { type: 'application/octet-stream' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = filename;
-                link.click();
-                URL.revokeObjectURL(link.href);
-            }
-
-            exportFrame() {
-                const frameGeometry = this.createFrameGeometry();
-                
-                // Create both rings with proper rotations
-                // Vertical ring (Yin frame)
-                const frameYinGeom = frameGeometry.clone();
-                frameYinGeom.rotateY(Math.PI / 2);
-                
-                // Horizontal ring (Yang frame)
-                const frameYangGeom = frameGeometry.clone();
-                frameYangGeom.rotateX(Math.PI / 2);
-                frameYangGeom.rotateZ(Math.PI / 2);
-                
-                // Merge both geometries into one
-                const mergedGeometry = new THREE.BufferGeometry();
-                const geometries = [frameYinGeom, frameYangGeom];
-                
-                // Manually merge the geometries
-                let totalVertices = 0;
-                let totalIndices = 0;
-                
-                for (const geom of geometries) {
-                    totalVertices += geom.attributes.position.count;
-                    if (geom.index) {
-                        totalIndices += geom.index.count;
-                    }
-                }
-                
-                const positions = new Float32Array(totalVertices * 3);
-                const normals = new Float32Array(totalVertices * 3);
-                const indices = new Uint32Array(totalIndices);
-                
-                let vertexOffset = 0;
-                let indexOffset = 0;
-                let vertexCount = 0;
-                
-                for (const geom of geometries) {
-                    const posAttr = geom.attributes.position;
-                    const normAttr = geom.attributes.normal;
-                    
-                    positions.set(posAttr.array, vertexOffset * 3);
-                    if (normAttr) {
-                        normals.set(normAttr.array, vertexOffset * 3);
-                    }
-                    
-                    if (geom.index) {
-                        const indexArray = geom.index.array;
-                        for (let i = 0; i < indexArray.length; i++) {
-                            indices[indexOffset + i] = indexArray[i] + vertexCount;
-                        }
-                        indexOffset += indexArray.length;
-                    }
-                    
-                    vertexCount += posAttr.count;
-                    vertexOffset += posAttr.count;
-                }
-                
-                mergedGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 4));
-                mergedGeometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-                mergedGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
-                
-                const frameMesh = new THREE.Mesh(mergedGeometry, this.materials.glass);
-                this.exportToSTL(frameMesh, 'gimbal_frame.stl');
-            }
-
-            exportYinRotor() {
-                const group = new THREE.Group();
-                const shape = new THREE.Mesh(this.createTeardropShape(), this.materials.yinWhite);
-                group.add(shape);
-                group.add(this.createBearingArc(this.materials.yinWhite, true));
-                this.exportToSTL(group, 'gimbal_yin_rotor.stl');
-            }
-
-            exportYangRotor() {
-                const group = new THREE.Group();
-                const shape = new THREE.Mesh(this.createTeardropShape(), this.materials.yangBlack);
-                group.add(shape);
-                group.add(this.createBearingArc(this.materials.yangBlack, false));
-                this.exportToSTL(group, 'gimbal_yang_rotor.stl');
-            }
-
-            // ========================================================================
-            // EVENT HANDLERS
-            // ========================================================================
-
-            setupEventListeners() {
-                // Controls toggle
-                const controlsToggle = document.getElementById('controls-toggle');
-                const controls = document.getElementById('controls');
-                
-                controlsToggle.addEventListener('click', () => {
-                    controls.classList.toggle('collapsed');
-                    controlsToggle.textContent = controls.classList.contains('collapsed') ? '☰' : '✕';
-                });
-
-                // Animation toggle
-                document.getElementById('toggleAnimation').addEventListener('click', (e) => {
-                    this.animationState.isPlaying = !this.animationState.isPlaying;
-                    e.target.textContent = this.animationState.isPlaying ? 
-                        'Pause Animation' : 'Resume Animation';
-                });
-
-                // Visibility toggles
-                document.getElementById('toggleYin').addEventListener('click', (e) => {
-                    this.visibility.yinAssembly = !this.visibility.yinAssembly;
-                    this.rotorYin.visible = this.visibility.yinAssembly;
-                    e.target.textContent = this.visibility.yinAssembly ? 'Hide Yin Assembly' : 'Show Yin Assembly';
-                    e.target.className = this.visibility.yinAssembly ? 'success' : '';
-                    if (!this.animationState.isPlaying) this.renderer.render(this.scene, this.camera);
-                });
-
-                document.getElementById('toggleYang').addEventListener('click', (e) => {
-                    this.visibility.yangAssembly = !this.visibility.yangAssembly;
-                    this.rotorYang.visible = this.visibility.yangAssembly;
-                    e.target.textContent = this.visibility.yangAssembly ? 'Hide Yang Assembly' : 'Show Yang Assembly';
-                    e.target.className = this.visibility.yangAssembly ? 'success' : '';
-                    if (!this.animationState.isPlaying) this.renderer.render(this.scene, this.camera);
-                });
-
-                document.getElementById('toggleFrame').addEventListener('click', (e) => {
-                    this.visibility.frame = !this.visibility.frame;
-                    this.frameYin.visible = this.visibility.frame;
-                    this.frameYang.visible = this.visibility.frame;
-                    e.target.textContent = this.visibility.frame ? 'Hide Frame' : 'Show Frame';
-                    e.target.className = this.visibility.frame ? 'success' : '';
-                    if (!this.animationState.isPlaying) this.renderer.render(this.scene, this.camera);
-                });
-
-                // Export buttons
-                document.getElementById('exportFrame').addEventListener('click', () => {
-                    this.exportFrame();
-                });
-
-                document.getElementById('exportYin').addEventListener('click', () => {
-                    this.exportYinRotor();
-                });
-
-                document.getElementById('exportYang').addEventListener('click', () => {
-                    this.exportYangRotor();
-                });
-
-                // Window resize
-                window.addEventListener('resize', () => {
-                    this.camera.aspect = window.innerWidth / window.innerHeight;
-                    this.camera.updateProjectionMatrix();
-                    this.renderer.setSize(window.innerWidth, window.innerHeight);
-                });
-                
-                // Click on canvas to toggle animation
-                this.renderer.domElement.addEventListener('click', () => {
-                    this.animationState.isPlaying = !this.animationState.isPlaying;
-                    const toggleButton = document.getElementById('toggleAnimation');
-                    toggleButton.textContent = this.animationState.isPlaying ? 
-                        'Pause Animation' : 'Resume Animation';
-                });
-            }
+          // Rotate Yang around Y axis (reversed relative to Yin)
+          yangGroup.rotation.y = -yinGroup.rotation.z;
         }
 
-        // ============================================================================
-        // INITIALIZE
-        // ============================================================================
-
-        const gimbal = new GimbalScene();
+        controls.update();
+        renderer.render(scene, camera);
+      }
     </script>
-</body>
+  </body>
 </html>
