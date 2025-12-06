@@ -314,6 +314,9 @@
 
               corners.forEach((ySign) => {
                 corners.forEach((zSign) => {
+                  // Filter Gears to match Model (Keep Anti-Diagonal Pairs)
+                  if (ySign === zSign) return;
+
                   const yLocal = ySign * offset;
                   const zLocal = zSign * offset;
 
@@ -322,8 +325,13 @@
                     xSq > 0 ? xSign * Math.sqrt(xSq) : xSign * headCenterR;
 
                   // Calculate Direction
-                  // Reverted to xSign * ySign to solve Q2/Q4 issue
-                  const dir = xSign * ySign;
+                  // User requested Opposite Direction for Far Side (xSign < 0).
+                  // Combined with previous "Opposite" logic:
+                  // Near (x>0): -1 * xSign * ySign = -ySign.
+                  // Far (x<0): Original was -1 * xSign * ySign = ySign.
+                  // Flip Far -> -ySign.
+                  // Result: dir = -1 * ySign.
+                  const dir = -1 * ySign;
 
                   addGear([x, yLocal, zLocal], dir, rotY);
                 });
