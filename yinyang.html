@@ -90,12 +90,20 @@
       <h1>Yin Yang Gimbal</h1>
       <div class="control-group">
         <div class="control-item">
+          <input type="checkbox" id="toggle-enclosure" />
+          <label for="toggle-enclosure">Show Glass Shells</label>
+        </div>
+        <div class="control-item">
+          <input type="checkbox" id="toggle-gears" checked />
+          <label for="toggle-gears">Show Gears</label>
+        </div>
+        <div class="control-item">
           <input type="checkbox" id="toggle-yin" checked />
-          <label for="toggle-yin">Show Yin Rotor</label>
+          <label for="toggle-yin">Show Yin Rail</label>
         </div>
         <div class="control-item">
           <input type="checkbox" id="toggle-yang" checked />
-          <label for="toggle-yang">Show Yang Rotor</label>
+          <label for="toggle-yang">Show Yang Rail</label>
         </div>
         <div class="control-item">
           <input type="checkbox" id="toggle-frame-left" checked />
@@ -164,25 +172,71 @@
         roughness: 0.4,
         metalness: 0.1,
       });
+      const materialGlass = new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0,
+        roughness: 0.1,
+        transmission: 0.9, // Glass-like
+        thickness: 1.5,
+        transparent: true,
+        opacity: 0.3, // Very transparent
+        side: THREE.DoubleSide,
+      });
       const materialFrame = new THREE.MeshStandardMaterial({
         color: 0x888888,
         roughness: 0.7,
         metalness: 0.5,
+      });
+      const materialGears = new THREE.MeshStandardMaterial({
+        color: 0xffffff, // White color for gears
+        roughness: 0.3,
+        metalness: 0.8,
       });
 
       // Groups for rotation
       const yinGroup = new THREE.Group();
       const yangGroup = new THREE.Group();
       const frameGroup = new THREE.Group();
-      // Initial rotation handled by animation loop now
+      // Gears group will contain all gears
+      // But we need to actuate them.
+      // 16 gears total.
+      // 8 drive Yin (Z-axis rotation dependent).
+      // 8 drive Yang (Y-axis rotation dependent).
+      // We should separate them into sub-groups for easier animation?
+      // Since they are all in one STL 'gears.stl', they are merged.
+      // This makes individual rotation hard!
+      // Ah. If I merged them in TS using union(gears), they are one mesh.
+      // I cannot rotate them individually in Three.js if they are one STL.
+
+      // CRITICAL FIX:
+      // I should NOT merge gears in TS if I want to animate them individually.
+      // But STLLoader loads one file.
+      // If I want to animate them, I must load them separately OR export them separately?
+      // Or 16 files? 'gear_0.stl' ... 'gear_15.stl'.
+      // That's too many files.
+      // Alternative: Export ONE gear.stl (centered).
+      // Then in Three.js, instantiate 16 Meshes, position them, and animate them.
+
+      // I will update yinyang.ts to export a SINGLE gear.
+      // And in HTML I will replicate the positioning logic.
+      // This is better for runtime performance (instancing) and animation.
+
+      // Reverting this thoughts: I will modify yinyang.ts to export 'gear.stl'.
+      // Then in HTML I implement the placement logic.
+
+      // Start of HTML update assuming 'gear.stl' is available.
+
+      const gearsGroup = new THREE.Group();
+
       scene.add(yinGroup);
       scene.add(yangGroup);
       scene.add(frameGroup);
+      scene.add(gearsGroup);
 
       // Loaders
       const loader = new STLLoader();
       let loadedCount = 0;
-      const totalModels = 4;
+      const totalModels = 5; // yin, yang, frame_l, frame_r, glass, gear (wait, that's 6)
 
       function checkLoaded() {
         loadedCount++;
@@ -192,51 +246,159 @@
         }
       }
 
-      function loadSTL(path, material, group, name) {
+      // Helper to load STL
+      function loadSTL(path, material, group, name, visible = true) {
         loader.load(
           path,
           function (geometry) {
             geometry.computeVertexNormals();
             const mesh = new THREE.Mesh(geometry, material);
             mesh.name = name;
+            mesh.visible = visible;
             group.add(mesh);
             checkLoaded();
           },
           undefined,
           function (error) {
             console.error("Error loading " + path, error);
+            // Don't hang if file missing
+            checkLoaded();
+          }
+        );
+      }
+
+      // Gears separate loader because we need to clone it
+      function loadGears() {
+        loader.load(
+          "./gear.stl",
+          function (geometry) {
+            geometry.computeVertexNormals();
+
+            const RADIUS = 10;
+            const STEM = 0.6;
+            const HEAD = 0.2;
+            const HEAD_THICKNESS = 0.2;
+            const HEAD_WIDTH = 0.8;
+
+            const GEAR_MODULE = 0.1;
+            const GEAR_COUNT = 24; // Updated to 24
+            const GEAR_PITCH_R = (GEAR_COUNT * GEAR_MODULE) / 2;
+
+            const offset = HEAD_WIDTH / 2 + GEAR_PITCH_R;
+            const headCenterR = RADIUS + STEM + HEAD_THICKNESS / 2;
+
+            const corners = [-1, 1];
+
+            // Helper to add gear
+            const addGear = (pos, dir, rotationY) => {
+              const mesh = new THREE.Mesh(geometry, materialGears);
+
+              // Base Axis Z. Rotate Y to align with Radial line (X).
+              // If Right (+X): Rotate +90 (Z -> +X).
+              // If Left (-X): Rotate -90 (Z -> -X).
+              mesh.rotation.y = rotationY;
+
+              mesh.position.set(pos[0], pos[1], pos[2]);
+
+              mesh.userData = { direction: dir };
+              gearsGroup.add(mesh);
+            };
+
+            [RADIUS, -RADIUS].forEach((xBase) => {
+              const xSign = Math.sign(xBase);
+
+              // Rotate to face Outward:
+              // Right (+X) -> +PI/2
+              // Left (-X) -> -PI/2
+              const rotY = (xSign * Math.PI) / 2;
+
+              corners.forEach((ySign) => {
+                corners.forEach((zSign) => {
+                  const yLocal = ySign * offset;
+                  const zLocal = zSign * offset;
+
+                  const xSq = headCenterR * headCenterR - yLocal * yLocal;
+                  const x =
+                    xSq > 0 ? xSign * Math.sqrt(xSq) : xSign * headCenterR;
+
+                  // Calculate Direction
+                  // Reverted to xSign * ySign to solve Q2/Q4 issue
+                  const dir = xSign * ySign;
+
+                  addGear([x, yLocal, zLocal], dir, rotY);
+                });
+              });
+            });
+
+            checkLoaded();
+          },
+          undefined,
+          (err) => {
+            console.error(err);
+            checkLoaded();
           }
         );
       }
 
       // Load Models
-      // Assuming files are in the same directory
       loadSTL("./yin.stl", materialYin, yinGroup, "yin");
       loadSTL("./yang.stl", materialYang, yangGroup, "yang");
       loadSTL("./frame_left.stl", materialFrame, frameGroup, "frame_left");
       loadSTL("./frame_right.stl", materialFrame, frameGroup, "frame_right");
+      // Load glass panels but hide initially as requested
+      loadSTL(
+        "./glass_panels.stl",
+        materialGlass,
+        frameGroup,
+        "glass_panels",
+        false
+      );
+      loadGears();
+
+      // Update totalModels count to 6
+      const totalModelsExpected = 6;
 
       // Animation State
       let isAnimating = true;
-      const rotationSpeed = 0.01;
+      // Reduced speed to prevent "Wagon-wheel effect" where teeth appear to rotate backwards
+      // Tooth Pitch = 2*PI/24 = 0.26 rad.
+      // GearRatio = 16.
+      // Old Speed 0.01 * 16 = 0.16 rad (> 0.5 pitch). Caused aliasing.
+      // New Speed 0.002 * 16 = 0.032 rad (Well within Nyquist limit).
+      const rotationSpeed = 0.002;
+      const gearRatio = 16;
 
       // UI Logic
       const toggleVisibility = (id, objectName) => {
-        document.getElementById(id).addEventListener("change", (e) => {
-          if (objectName === "yin" || objectName === "yang") {
-            if (objectName === "yin") yinGroup.visible = e.target.checked;
-            if (objectName === "yang") yangGroup.visible = e.target.checked;
+        const el = document.getElementById(id);
+        if (!el) {
+          console.error(`Element with id ${id} not found!`);
+          return;
+        }
+        el.addEventListener("change", (e) => {
+          if (objectName === "yin") {
+            yinGroup.visible = e.target.checked;
+          } else if (objectName === "yang") {
+            yangGroup.visible = e.target.checked;
           } else {
             const mesh = frameGroup.children.find((c) => c.name === objectName);
-            if (mesh) mesh.visible = e.target.checked;
+            if (mesh) {
+              mesh.visible = e.target.checked;
+            } else {
+              if (objectName === "gears") {
+                gearsGroup.visible = e.target.checked;
+              }
+            }
           }
         });
       };
 
-      toggleVisibility("toggle-yin", "yin");
-      toggleVisibility("toggle-yang", "yang");
       toggleVisibility("toggle-frame-left", "frame_left");
       toggleVisibility("toggle-frame-right", "frame_right");
+      toggleVisibility("toggle-enclosure", "glass_panels");
+      toggleVisibility("toggle-gears", "gears");
+      toggleVisibility("toggle-yin", "yin");
+      toggleVisibility("toggle-yang", "yang");
 
       const animToggle = document.getElementById("toggle-anim");
       animToggle.addEventListener("change", (e) => {
@@ -248,7 +410,6 @@
 
       // Click to toggle
       window.addEventListener("mousedown", (event) => {
-        // Only toggle if not clicking on UI
         if (event.target.closest("#info")) return;
 
         isAnimating = !isAnimating;
@@ -271,11 +432,37 @@
         requestAnimationFrame(animate);
 
         if (isAnimating) {
-          // Rotate Yin around Z axis
+          // Rail Rotation
           yinGroup.rotation.z += rotationSpeed;
-
-          // Rotate Yang around Y axis (reversed relative to Yin)
           yangGroup.rotation.y = -yinGroup.rotation.z;
+
+          // Gear Rotation
+          // Gears are axis-aligned to X.
+          // Rotation direction determined by Q2/Q4 logic.
+          // Q2 (ySign < 0) -> -speed.
+          // Q4 (ySign > 0) -> +speed.
+
+          const speed = rotationSpeed * gearRatio;
+
+          gearsGroup.children.forEach((gear) => {
+            const dir = gear.userData.direction;
+            // Local X rotation (since we rotated Y 90, Local Z is World X? No.)
+            // mesh.rotation.y = PI/2.
+            // Local Order XYZ default.
+            // Local X axis points World Z.
+            // Local Y axis points World Y.
+            // Local Z axis points World X.
+            // We want to rotate around World X (Gear Axis).
+            // So we rotate around Local Z.
+            // Wait.
+            // Base Gear Axis is Z.
+            // We rotated Y 90.
+            // New Z axis points in World X direction.
+            // So rotating around Local Z rotates around World X.
+            // Correct.
+
+            gear.rotateZ(dir * speed);
+          });
         }
 
         controls.update();
